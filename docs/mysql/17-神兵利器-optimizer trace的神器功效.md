@@ -1,4 +1,4 @@
-# optimizer trace 表的神奇功效
+# 第17章 神兵利器-optimizer trace表的神器功效
 
 标签： MySQL 是怎样运行的
 
@@ -18,7 +18,7 @@ mysql> SHOW VARIABLES LIKE 'optimizer_trace';
 1 row in set (0.02 sec)
 ```
 可以看到`enabled`值为`off`，表明这个功能默认是关闭的。
-```!
+```
 小贴士：
 one_line的值是控制输出格式的，如果为on那么所有输出都将在一行中展示，不适合人阅读，所以我们就保持其默认值为off吧。
 ```

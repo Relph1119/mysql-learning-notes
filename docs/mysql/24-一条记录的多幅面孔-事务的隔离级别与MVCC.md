@@ -1,4 +1,4 @@
-# 事务隔离级别和MVCC
+# 第24章 一条记录的多幅面孔-事务的隔离级别与MVCC
 
 标签： MySQL是怎样运行的
 
@@ -14,7 +14,7 @@ CREATE TABLE hero (
     PRIMARY KEY (number)
 ) Engine=InnoDB CHARSET=utf8;
 ```
-```!
+```
 小贴士：
 注意我们把这个hero表的主键命名为number，而不是id，主要是想和后边要用到的事务id做区别，大家不用大惊小怪哈～ 
 ```
@@ -75,7 +75,7 @@ mysql> SELECT * FROM hero;
     
     有的同学会有疑问，那如果`Session B`中是删除了一些符合`number > 0`的记录而不是插入新记录，那`Session A`中之后再根据`number > 0`的条件读取的记录变少了，这种现象算不算`幻读`呢？明确说一下，这种现象不属于`幻读`，`幻读`强调的是一个事务按照某个相同条件多次读取记录时，后读取时读到了之前没有读到的记录。
     
-    ```!
+    ```
     小贴士：
     那对于先前已经读到的记录，之后又读取不到这种情况，算啥呢？其实这相当于对每一条记录都发生了不可重复读的现象。幻读只是重点强调了读取到了之前读取没有获取到的记录。
     ```
@@ -204,7 +204,7 @@ mysql> SELECT @@transaction_isolation;
 1 row in set (0.00 sec)
 ```
 
-```!
+```
 小贴士：
 我们也可以使用设置系统变量transaction_isolation的方式来设置事务的隔离级别，不过我们前边介绍过，一般系统变量只有GLOBAL和SESSION两个作用范围，而这个transaction_isolation却有3个（与上边 SET TRANSACTION ISOLATION LEVEL的语法相对应），设置语法上有些特殊，更多详情可以参见文档：https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_transaction_isolation。
 另外，transaction_isolation是在MySQL 5.7.20的版本中引入来替换tx_isolation的，如果你使用的是之前版本的MySQL，请将上述用到系统变量transaction_isolation的地方替换为tx_isolation。
@@ -233,7 +233,7 @@ mysql> SELECT * FROM hero;
 
 ![image_1d8oab1ubb7v5f41j2pai21co19.png-22.4kB][5]
 
-```!
+```
 小贴士：
 实际上insert undo只在事务回滚时起作用，当事务提交后，该类型的undo日志就没用了，它占用的Undo Log Segment也会被系统回收（也就是该undo日志占用的Undo页面链表要么被重用，要么被释放）。虽然真正的insert undo日志占用的存储空间被释放了，但是roll_pointer的值并不会被清除，roll_pointer属性占用7个字节，第一个比特位就标记着它指向的undo日志的类型，如果该比特位的值为1时，就代表着它zhi向的undo日志类型为insert undo。所以我们之后在画图时都会把insert undo给去掉，大家留意一下就好了。
 ```
@@ -242,7 +242,7 @@ mysql> SELECT * FROM hero;
 
 ![image_1d8obbc861ulkpt3no31gecrho16.png-92.3kB][6]
 
-```!
+```
 小贴士：
 能不能在两个事务中交叉更新同一条记录呢？哈哈，这不就是一个事务修改了另一个未提交事务修改过的数据，沦为了脏写了么？InnoDB使用锁来保证不会有脏写情况的发生，也就是在第一个事务更新了某条记录后，就会给这条记录加锁，另一个事务再次更新时就需要等待第一个事务提交了，把锁释放之后才可以继续更新。关于锁的更多细节我们后续的文章中再唠叨哈～
 ```
@@ -261,14 +261,14 @@ mysql> SELECT * FROM hero;
 
 - `max_trx_id`：表示生成`ReadView`时系统中应该分配给下一个事务的`id`值。
 
-    ```!
+    ```
     小贴士：
     注意max_trx_id并不是m_ids中的最大值，事务id是递增分配的。比方说现在有id为1，2，3这三个事务，之后id为3的事务提交了。那么一个新的读事务在生成ReadView时，m_ids就包括1和2，min_trx_id的值就是1，max_trx_id的值就是4。
     ```
     
 - `creator_trx_id`：表示生成该`ReadView`的事务的`事务id`。
 
-    ```!
+    ```
     小贴士：
     我们前边说过，只有在对表中的记录做改动时（执行INSERT、DELETE、UPDATE这些语句时）才会为事务分配事务id，否则在一个只读事务中的事务id值都默认为0。
     ```
@@ -315,7 +315,7 @@ BEGIN;
 # 更新了一些别的表的记录
 ...
 ```
-```!
+```
 小贴士：
 再次强调一遍，事务执行过程中，只有在第一次真正修改记录时（比如使用INSERT、DELETE、UPDATE语句），才会被分配一个单独的事务id，这个事务id是递增的。所以我们才在Transaction 200中更新一些别的表的记录，目的是让它分配事务id。
 ```
@@ -490,7 +490,7 @@ SELECT * FROM hero WHERE number = 1; # 得到的列name的值仍为'刘备'
 ### MVCC小结
 从上边的描述中我们可以看出来，所谓的`MVCC`（Multi-Version Concurrency Control ，多版本并发控制）指的就是在使用`READ COMMITTD`、`REPEATABLE READ`这两种隔离级别的事务在执行普通的`SEELCT`操作时访问记录的版本链的过程，这样子可以使不同事务的`读-写`、`写-读`操作并发执行，从而提升系统性能。`READ COMMITTD`、`REPEATABLE READ`这两个隔离级别的一个很大不同就是：<span style="color:red">生成ReadView的时机不同，READ COMMITTD在每一次进行普通SELECT操作前都会生成一个ReadView，而REPEATABLE READ只在第一次进行普通SELECT操作前生成一个ReadView，之后的查询操作都重复使用这个ReadView就好了</span>。
 
-```!
+```
 小贴士：
 我们之前说执行DELETE语句或者更新主键的UPDATE语句并不会立即把对应的记录完全从页面中删除，而是执行一个所谓的delete mark操作，相当于只是对记录打上了一个删除标志位，这主要就是为MVCC服务的，大家可以对比上边举的例子自己试想一下怎么使用。
 另外，所谓的MVCC只是在我们进行普通的SEELCT查询时才生效，截止到目前我们所见的所有SELECT语句都算是普通的查询，至于啥是个不普通的查询，我们稍后再说哈～
