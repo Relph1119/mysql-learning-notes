@@ -77,7 +77,7 @@
     
     - 根据上一步骤得到的二级索引记录中的主键值进行回表，找到完整的用户记录再检测该记录是否符合`key1 LIKE '%a'`这个条件，将符合条件的记录加入到最后的结果集。
     
-    但是虽然`key1 LIKE '%a'`不能组成范围区间参与`range`访问方法的执行，但这个条件毕竟只涉及到了`key1`列，所以设计`MySQL`的大佬把上边的步骤改进了一下：
+    但是虽然`key1 LIKE '%a'`不能组成范围区间参与`range`访问方法的执行，但这个条件毕竟只涉及到了`key1`列，所以设计`MySQL`的大佬把上面的步骤改进了一下：
     
     - 先根据`key1 > 'z'`这个条件，定位到二级索引`idx_key1`中对应的二级索引记录。
     
@@ -163,8 +163,7 @@
     
     
     ```
-    小贴士：
-    右（外）连接可以被转换为左（外）连接，所以就不提右（外）连接的情况了。
+    小贴士：右（外）连接可以被转换为左（外）连接，所以就不提右（外）连接的情况了。
     ```
 
 - `Using intersect(...)`、`Using union(...)`和`Using sort_union(...)`
@@ -324,7 +323,7 @@
     ```
 
 ## Json格式的执行计划
-我们上边介绍的`EXPLAIN`语句输出中缺少了一个衡量执行计划好坏的重要属性 —— <span style="color:red">成本</span>。不过设计`MySQL`的大佬贴心的为我们提供了一种查看某个执行计划花费的成本的方式：
+我们上面介绍的`EXPLAIN`语句输出中缺少了一个衡量执行计划好坏的重要属性 —— <span style="color:red">成本</span>。不过设计`MySQL`的大佬贴心的为我们提供了一种查看某个执行计划花费的成本的方式：
 
 - 在`EXPLAIN`单词和真正的查询语句中间加上`FORMAT=JSON`。
 
@@ -434,8 +433,7 @@ EXPLAIN: {
     - 检测`rows × (1 - filter)`条记录的`CPU`成本
 
     ```
-    小贴士：
-    rows和filter都是我们前面介绍执行计划的输出列，在JSON格式的执行计划中，rows相当于rows_examined_per_scan，filtered名称不变。
+    小贴士：rows和filter都是我们前面介绍执行计划的输出列，在JSON格式的执行计划中，rows相当于rows_examined_per_scan，filtered名称不变。
     ```
     
 - `eval_cost`是这样计算的：
@@ -485,7 +483,7 @@ mysql> SHOW WARNINGS\G
 Message: /* select#1 */ select `xiaohaizi`.`s1`.`key1` AS `key1`,`xiaohaizi`.`s2`.`key1` AS `key1` from `xiaohaizi`.`s1` join `xiaohaizi`.`s2` where ((`xiaohaizi`.`s1`.`key1` = `xiaohaizi`.`s2`.`key1`) and (`xiaohaizi`.`s2`.`common_field` is not null))
 1 row in set (0.00 sec)
 ```
-大家可以看到`SHOW WARNINGS`展示出来的信息有三个字段，分别是`Level`、`Code`、`Message`。我们最常见的就是`Code`为`1003`的信息，当`Code`值为`1003`时，`Message`字段展示的信息<span style="color:red">类似于</span>查询优化器将我们的查询语句重写后的语句。比如我们上边的查询本来是一个左（外）连接查询，但是有一个`s2.common_field IS NOT NULL`的条件，着就会导致查询优化器把左（外）连接查询优化为内连接查询，从`SHOW WARNINGS`的`Message`字段也可以看出来，原本的`LEFT JOIN`已经变成了`JOIN`。
+大家可以看到`SHOW WARNINGS`展示出来的信息有三个字段，分别是`Level`、`Code`、`Message`。我们最常见的就是`Code`为`1003`的信息，当`Code`值为`1003`时，`Message`字段展示的信息<span style="color:red">类似于</span>查询优化器将我们的查询语句重写后的语句。比如我们上面的查询本来是一个左（外）连接查询，但是有一个`s2.common_field IS NOT NULL`的条件，着就会导致查询优化器把左（外）连接查询优化为内连接查询，从`SHOW WARNINGS`的`Message`字段也可以看出来，原本的`LEFT JOIN`已经变成了`JOIN`。
 
 但是大家一定要注意，我们说`Message`字段展示的信息<span style="color:red">类似于</span>查询优化器将我们的查询语句重写后的语句，并不是等价于，也就是说`Message`字段展示的信息并不是标准的查询语句，在很多情况下并不能直接拿到黑框框中运行，它只能作为帮助我们理解查`MySQL`将如何执行查询语句的一个参考依据而已。
 

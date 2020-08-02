@@ -48,7 +48,7 @@ SELECT ...;
 # 3. 从OPTIMIZER_TRACE表中查看上一个查询的优化过程
 SELECT * FROM information_schema.OPTIMIZER_TRACE;
 
-# 4. 可能你还要观察其他语句执行的优化过程，重复上边的第2、3步
+# 4. 可能你还要观察其他语句执行的优化过程，重复上面的第2、3步
 ...
 
 # 5. 当你停止查看语句的优化过程时，把optimizer trace功能关闭
@@ -293,7 +293,7 @@ TRACE: {
           {
             
             # 分析各种可能的执行计划
-            #（对多表查询这可能有很多种不同的方案，单表查询的方案上边已经分析过了，直接选取idx_key2就好）
+            #（对多表查询这可能有很多种不同的方案，单表查询的方案上面已经分析过了，直接选取idx_key2就好）
             "considered_execution_plans": [
               {
                 "plan_prefix": [

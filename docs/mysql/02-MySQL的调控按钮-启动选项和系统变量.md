@@ -9,7 +9,7 @@
 ```
 mysqld --skip-networking
 ```
-&emsp;&emsp;可以看到，我们在命令行中指定启动选项时需要在选项名前加上`--`前缀。另外，如果选项名是由多个单词构成的，它们之间可以由短划线`-`连接起来，也可以使用下划线`_`连接起来，也就是说`skip-networking`和`skip_networking`表示的含义是相同的。所以上边的写法与下面的写法是等价的：
+&emsp;&emsp;可以看到，我们在命令行中指定启动选项时需要在选项名前加上`--`前缀。另外，如果选项名是由多个单词构成的，它们之间可以由短划线`-`连接起来，也可以使用下划线`_`连接起来，也就是说`skip-networking`和`skip_networking`表示的含义是相同的。所以上面的写法与下面的写法是等价的：
 ```
 mysqld --skip_networking
 ```
@@ -71,7 +71,7 @@ mysqld --default-storage-engine = MyISAM
 ```
 mysqld -P3307
 ```
-&emsp;&emsp;使用短形式指定启动选项时，选项名和选项值之间可以没有间隙，或者用空白字符隔开（`-p`选项有些特殊，`-p`和密码值之间不能有空白字符），也就是说上边的命令形式和下面的是等价的：
+&emsp;&emsp;使用短形式指定启动选项时，选项名和选项值之间可以没有间隙，或者用空白字符隔开（`-p`选项有些特殊，`-p`和密码值之间不能有空白字符），也就是说上面的命令形式和下面的是等价的：
 ```
 mysqld -P 3307
 ```
@@ -219,7 +219,7 @@ option2 = value2      #这是option2，该选项需要选项值
 |`mysqladmin`|启动客户端|`[mysqladmin]`、`[client]`|
 |`mysqldump`|启动客户端|`[mysqldump]`、`[client]`|
 
-&emsp;&emsp;现在我们以`macOS`操作系统为例，在`/etc/mysql/my.cnf`这个配置文件中添加一些内容（`Windows`系统参考上边提到的配置文件路径）：
+&emsp;&emsp;现在我们以`macOS`操作系统为例，在`/etc/mysql/my.cnf`这个配置文件中添加一些内容（`Windows`系统参考上面提到的配置文件路径）：
 ```
 [server]
 skip-networking
@@ -229,7 +229,7 @@ default-storage-engine=MyISAM
 ```
 mysqld
 ```
-&emsp;&emsp;虽然在命令行没有添加启动选项，但是在程序启动的时候，就会默认的到我们上边提到的配置文件路径下查找配置文件，其中就包括`/etc/mysql/my.cnf`。又由于`mysqld`命令可以读取`[server]`选项组的内容，所以`skip-networking`和`default-storage-engine=MyISAM`这两个选项是生效的。你可以把这些启动选项放在`[client]`组里再试试用`mysqld`启动服务器程序，看一下里边的启动选项生效不（剧透一下，不生效）。
+&emsp;&emsp;虽然在命令行没有添加启动选项，但是在程序启动的时候，就会默认的到我们上面提到的配置文件路径下查找配置文件，其中就包括`/etc/mysql/my.cnf`。又由于`mysqld`命令可以读取`[server]`选项组的内容，所以`skip-networking`和`default-storage-engine=MyISAM`这两个选项是生效的。你可以把这些启动选项放在`[client]`组里再试试用`mysqld`启动服务器程序，看一下里边的启动选项生效不（剧透一下，不生效）。
 ```
 小贴士：如果我们想指定mysql.server程序的启动参数，则必须将它们放在配置文件中，而不是放在命令行中。mysql.server仅支持start和stop作为命令行参数。
 ```
@@ -334,7 +334,7 @@ mysql>
 ### 设置系统变量
 
 #### 通过启动选项设置
-&emsp;&emsp;大部分的`系统变量`都可以通过启动服务器时传送启动选项的方式来进行设置。如何填写启动选项我们上边已经花了大篇幅来介绍了，就是下面两种方式：
+&emsp;&emsp;大部分的`系统变量`都可以通过启动服务器时传送启动选项的方式来进行设置。如何填写启动选项我们上面已经花了大篇幅来介绍了，就是下面两种方式：
 
 - 通过命令行添加启动选项。
 
@@ -351,7 +351,7 @@ mysql>
     max-connections=10
     ```
 
-&emsp;&emsp;当使用上边两种方式中的任意一种启动服务器程序后，我们再来查看一下系统变量的值：
+&emsp;&emsp;当使用上面两种方式中的任意一种启动服务器程序后，我们再来查看一下系统变量的值：
 ```
 mysql> SHOW VARIABLES LIKE 'default_storage_engine';
 +------------------------+--------+
@@ -412,7 +412,7 @@ SET [@@(GLOBAL|SESSION).]var_name = XXX;
 语句二：SET @@SESSION.default_storage_engine = MyISAM;
 语句三：SET default_storage_engine = MyISAM;
 ```
-&emsp;&emsp;从上边的`语句三`也可以看出，<span style="color:red">如果在设置系统变量的语句中省略了作用范围，默认的作用范围就是`SESSION`</span>。也就是说`SET 系统变量名 = 值`和`SET SESSION 系统变量名 = 值`是等价的。
+&emsp;&emsp;从上面的`语句三`也可以看出，<span style="color:red">如果在设置系统变量的语句中省略了作用范围，默认的作用范围就是`SESSION`</span>。也就是说`SET 系统变量名 = 值`和`SET SESSION 系统变量名 = 值`是等价的。
 
 ##### 查看不同作用范围的系统变量
 &emsp;&emsp;既然`系统变量`有`作用范围`之分，那我们的`SHOW VARIABLES`语句查看的是什么`作用范围`的`系统变量`呢？
