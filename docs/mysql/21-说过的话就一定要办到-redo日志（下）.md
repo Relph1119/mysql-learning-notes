@@ -18,9 +18,7 @@
     &emsp;&emsp;后台有一个线程，大约每秒都会刷新一次`log buffer`中的`redo`日志到磁盘。
 
 - 正常关闭服务器时
-
 - 做所谓的`checkpoint`时（我们现在没介绍过`checkpoint`的概念，稍后会仔细介绍，稍安勿躁）    
-
 - 其他的一些情况...
 
 ### redo日志文件组
@@ -53,7 +51,6 @@
 `redo`日志文件组中的每个文件大小都一样，格式也一样，都是由两部分组成：
 
 - 前2048个字节，也就是前4个block是用来存储一些管理信息的。
-
 - 从第2048字节往后是用来存储`log buffer`中的block镜像的。
 
 &emsp;&emsp;所以我们前面所说的`循环`使用redo日志文件，其实是从每个日志文件的第2048个字节开始算，画个示意图就是这样：
@@ -245,13 +242,9 @@ Last checkpoint at  124052494
 (...省略后边的许多状态)
 ```
 其中：
-
 - `Log sequence number`：代表系统中的`lsn`值，也就是当前系统已经写入的`redo`日志量，包括写入`log buffer`中的日志。
-
 - `Log flushed up to`：代表`flushed_to_disk_lsn`的值，也就是当前系统已经写入磁盘的`redo`日志量。
-
 - `Pages flushed up to`：代表`flush链表`中被最早修改的那个页面对应的`oldest_modification`属性值。
-
 - `Last checkpoint at`：当前系统的`checkpoint_lsn`值。
 
 ## innodb_flush_log_at_trx_commit的用法
@@ -262,7 +255,6 @@ Last checkpoint at  124052494
     &emsp;&emsp;这样很明显会加快请求处理速度，但是如果事务提交后服务器挂了，后台线程没有及时将`redo`日志刷新到磁盘，那么该事务对页面的修改会丢失。
 
 - `1`：当该系统变量值为1时，表示在事务提交时需要将`redo`日志同步到磁盘，可以保证事务的`持久性`。`1`也是`innodb_flush_log_at_trx_commit`的默认值。
-
 - `2`：当该系统变量值为2时，表示在事务提交时需要将`redo`日志写到操作系统的缓冲区中，但并不需要保证将日志真正的刷新到磁盘。
 
     &emsp;&emsp;这种情况下如果数据库挂了，操作系统没挂的话，事务的`持久性`还是可以保证的，但是操作系统也挂了的话，那就不能保证`持久性`了。

@@ -92,15 +92,11 @@ innodb_buffer_pool_size = 268435456
     &emsp;&emsp;扫描全表意味着什么？意味着将访问到该表所在的所有页！假设这个表中记录非常多的话，那该表会占用特别多的`页`，当需要访问这些页时，会把它们统统都加载到`Buffer Pool`中，这也就意味着吧唧一下，`Buffer Pool`中的所有页都被换了一次血，其他查询语句在执行时又得执行一次从磁盘加载到`Buffer Pool`的操作。而这种全表扫描的语句执行的频率也不高，每次执行都要把`Buffer Pool`中的缓存页换一次血，这严重的影响到其他查询对 `Buffer Pool`的使用，从而<span style="color:red">大大降低了缓存命中率</span>。
 
 &emsp;&emsp;总结一下上面说的可能降低`Buffer Pool`的两种情况：
-
 - 加载到`Buffer Pool`中的页不一定被用到。
-
 - 如果非常多的使用频率偏低的页被同时加载到`Buffer Pool`时，可能会把那些使用频率非常高的页从`Buffer Pool`中淘汰掉。
 
 &emsp;&emsp;因为有这两种情况的存在，所以设计`InnoDB`的大佬把这个`LRU链表`按照一定比例分成两截，分别是：
-
 - 一部分存储使用频率非常高的缓存页，所以这一部分链表也叫做`热数据`，或者称`young区域`。
-
 - 另一部分存储使用频率不是很高的缓存页，所以这一部分链表也叫做`冷数据`，或者称`old区域`。
 
 &emsp;&emsp;为了方便大家理解，我们把示意图做了简化，各位领会精神就好：
@@ -314,31 +310,20 @@ I/O sum[134264]:cur[144], unzip sum[16]:cur[0]
 mysql>
 ```
 &emsp;&emsp;我们来详细看一下这里边的每个值都代表什么意思：
-
 - `Total memory allocated`：代表`Buffer Pool`向操作系统申请的连续内存空间大小，包括全部控制块、缓存页、以及碎片的大小。
-
 - `Dictionary memory allocated`：为数据字典信息分配的内存空间大小，注意这个内存空间和`Buffer Pool`没什么关系，不包括在`Total memory allocated`中。
-
 - `Buffer pool size`：代表该`Buffer Pool`可以容纳多少缓存`页`，注意，单位是`页`！
-
 - `Free buffers`：代表当前`Buffer Pool`还有多少空闲缓存页，也就是`free链表`中还有多少个节点。
-
 - `Database pages`：代表`LRU`链表中的页的数量，包含`young`和`old`两个区域的节点数量。
-
 - `Old database pages`：代表`LRU`链表`old`区域的节点数量。
-
 - `Modified db pages`：代表脏页数量，也就是`flush链表`中节点的数量。
-
 - `Pending reads`：正在等待从磁盘上加载到`Buffer Pool`中的页面数量。
 
     &emsp;&emsp;当准备从磁盘中加载某个页面时，会先为这个页面在`Buffer Pool`中分配一个缓存页以及它对应的控制块，然后把这个控制块添加到`LRU`的`old`区域的头部，但是这个时候真正的磁盘页并没有被加载进来，`Pending reads`的值会跟着加1。
 
 - `Pending writes LRU`：即将从`LRU`链表中刷新到磁盘中的页面数量。
-
 - `Pending writes flush list`：即将从`flush`链表中刷新到磁盘中的页面数量。
-
 - `Pending writes single page`：即将以单个页面的形式刷新到磁盘中的页面数量。
-
 - `Pages made young`：代表`LRU`链表中曾经从`old`区域移动到`young`区域头部的节点数量。
     
     &emsp;&emsp;这里需要注意，一个节点每次只有从`old`区域移动到`young`区域头部时才会将`Pages made young`的值加1，也就是说如果该节点本来就在`young`区域，由于它符合在`young`区域1/4后边的要求，下一次访问这个页面时也会将它移动到`young`区域头部，但这个过程并不会导致`Pages made young`的值加1。
@@ -348,13 +333,9 @@ mysql>
     &emsp;&emsp;这里需要注意，对于处在`young`区域的节点，如果由于它在`young`区域的1/4处而导致它没有被移动到`young`区域头部，这样的访问并不会将`Page made not young`的值加1。
     
 - `youngs/s`：代表每秒从`old`区域被移动到`young`区域头部的节点数量。
-
 - `non-youngs/s`：代表每秒由于不满足时间限制而不能从`old`区域移动到`young`区域头部的节点数量。
-
 - `Pages read`、`created`、`written`：代表读取，创建，写入了多少页。后边跟着读取、创建、写入的速率。
-
 - `Buffer pool hit rate`：表示在过去某段时间，平均访问1000次页面，有多少次该页面已经被缓存到`Buffer Pool`了。
-
 - `young-making rate`：表示在过去某段时间，平均访问1000次页面，有多少次访问使页面移动到`young`区域的头部了。
 
     &emsp;&emsp;需要大家注意的一点是，这里统计的将页面移动到`young`区域的头部次数不仅仅包含从`old`区域移动到`young`区域头部的次数，还包括从`young`区域移动到`young`区域头部的次数（访问某个`young`区域的节点，只要该节点在`young`区域的1/4处往后，就会把它移动到`young`区域的头部）。
@@ -364,15 +345,10 @@ mysql>
     &emsp;&emsp;需要大家注意的一点是，这里统计的没有将页面移动到`young`区域的头部次数不仅仅包含因为设置了`innodb_old_blocks_time`系统变量而导致访问了`old`区域中的节点但没把它们移动到`young`区域的次数，还包含因为该节点在`young`区域的前1/4处而没有被移动到`young`区域头部的次数。
 
 - `LRU len`：代表`LRU链表`中节点的数量。
-
 - `unzip_LRU`：代表`unzip_LRU链表`中节点的数量（由于我们没有具体介绍过这个链表，现在可以忽略它的值）。
-
 - `I/O sum`：最近50s读取磁盘页的总数。
-
 - `I/O cur`：现在正在读取的磁盘页数量。
-
 - `I/O unzip sum`：最近50s解压的页面数量。
-
 - `I/O unzip cur`：正在解压的页面数量。
 
 ## 总结

@@ -22,13 +22,9 @@ mysql> SET optimizer_trace="enabled=on";
 Query OK, 0 rows affected (0.00 sec)
 ```
 &emsp;&emsp;然后我们就可以输入我们想要查看优化过程的查询语句，当该查询语句执行完成后，就可以到`information_schema`数据库下的`OPTIMIZER_TRACE`表中查看完整的优化过程。这个`OPTIMIZER_TRACE`表有4个列，分别是：
-
 - `QUERY`：表示我们的查询语句。
-
 - `TRACE`：表示优化过程的JSON格式文本。
-
 - `MISSING_BYTES_BEYOND_MAX_MEM_SIZE`：由于优化过程可能会输出很多，如果超过某个限制时，多余的文本将不会被显示，这个字段展示了被忽略的文本字节数。
-
 - `INSUFFICIENT_PRIVILEGES`：表示是否没有权限查看优化过程，默认值是0，只有某些特殊情况下才会是`1`，我们暂时不关心这个字段的值。
 
 &emsp;&emsp;完整的使用`optimizer trace`功能的步骤总结如下：
@@ -362,9 +358,7 @@ INSUFFICIENT_PRIVILEGES: 0
 &emsp;&emsp;大家看到这个输出的第一感觉就是这文本也太多了点儿吧，其实这只是优化器执行过程中的一小部分，设计`MySQL`的大佬可能会在之后的版本中添加更多的优化过程信息。不过杂乱之中其实还是蛮有规律的，优化过程大致分为了三个阶段：
 
 - `prepare`阶段
-
 - `optimize`阶段
-
 - `execute`阶段
 
 &emsp;&emsp;我们所说的基于成本的优化主要集中在`optimize`阶段，对于单表查询来说，我们主要关注`optimize`阶段的`"rows_estimation"`这个过程，这个过程深入分析了对单表查询的各种执行方案的成本；对于多表连接查询来说，我们更多需要关注`"considered_execution_plans"`这个过程，这个过程里会写明各种不同的连接方式所对应的成本。反正优化器最终会选择成本最低的那种方案来作为最终的执行计划，也就是我们使用`EXPLAIN`语句所展现出的那种方案。

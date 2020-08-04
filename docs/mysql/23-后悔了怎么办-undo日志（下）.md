@@ -7,9 +7,7 @@
 ![image_1d79gnaudfg2psk2l7mi1146r20.png-104.8kB][1]
 
 &emsp;&emsp;在某个表空间内，我们可以通过一个页的页号和在页内的偏移量来唯一定位一个节点的位置，这两个信息也就相当于指向这个节点的一个指针。所以：
-
 - `Pre Node Page Number`和`Pre Node Offset`的组合就是指向前一个节点的指针
-
 - `Next Node Page Number`和`Next Node Offset`的组合就是指向后一个节点的指针。
 
 &emsp;&emsp;整个`List Node`占用`12`个字节的存储空间。
@@ -19,11 +17,8 @@
 ![image_1d79o8ra61jh6k0k6af13vpg329.png-103.9kB][2]
 
 其中：
-
 - `List Length`表明该链表一共有多少节点。
-
 - `First Node Page Number`和`First Node Offset`的组合就是指向链表头节点的指针。
-
 - `Last Node Page Number`和`Last Node Offset`的组合就是指向链表尾节点的指针。
 
 &emsp;&emsp;整个`List Base Node`占用`16`个字节的存储空间。
@@ -52,7 +47,6 @@
     &emsp;&emsp;我们前面介绍了好几种类型的`undo日志`，它们可以被分为两个大类：
     
     - `TRX_UNDO_INSERT`（使用十进制`1`表示）：类型为`TRX_UNDO_INSERT_REC`的`undo日志`属于此大类，一般由`INSERT`语句产生，或者在`UPDATE`语句中有更新主键的情况也会产生此类型的`undo日志`。
-    
     - `TRX_UNDO_UPDATE`（使用十进制`2`表示），除了类型为`TRX_UNDO_INSERT_REC`的`undo日志`，其他类型的`undo日志`都属于这个大类，比如我们前面说的`TRX_UNDO_DEL_MARK_REC`、`TRX_UNDO_UPD_EXIST_REC`什么的，一般由`DELETE`、`UPDATE`语句产生的`undo日志`属于这个大类。
     
     &emsp;&emsp;这个`TRX_UNDO_PAGE_TYPE`属性可选的值就是上面的两个，用来标记本页面用于存储哪个大类的`undo日志`，不同大类的`undo日志`不能混着存储，比如一个`Undo页面`的`TRX_UNDO_PAGE_TYPE`属性值为`TRX_UNDO_INSERT`，那么这个页面就只能存储类型为`TRX_UNDO_INSERT_REC`的`undo日志`，其他类型的`undo日志`就不能放到这个页面中了。
@@ -62,7 +56,6 @@
     ```
 
 - `TRX_UNDO_PAGE_START`：表示在当前页面中是从什么位置开始存储`undo日志`的，或者说表示第一条`undo日志`在本页面中的起始偏移量。
-
 - `TRX_UNDO_PAGE_FREE`：与上面的`TRX_UNDO_PAGE_START`对应，表示当前页面中存储的最后一条`undo`日志结束时的偏移量，或者说从这个位置开始，可以继续写入新的`undo日志`。
     
     &emsp;&emsp;假设现在向页面中写入了3条`undo日志`，那么`TRX_UNDO_PAGE_START`和`TRX_UNDO_PAGE_FREE`的示意图就是这样：
@@ -93,15 +86,10 @@
 ![image_1d7bg5o7c3t11nch988lj51hsl9.png-106.8kB][9]
 
 &emsp;&emsp;当然，并不是在事务一开始就会为这个事务分配这4个链表，具体分配策略如下：
-
 - 刚刚开启事务时，一个`Undo页面`链表也不分配。
-
 - 当事务执行过程中向普通表中插入记录或者执行更新记录主键的操作之后，就会为其分配一个`普通表的insert undo链表`。
-
 - 当事务执行过程中删除或者更新了普通表中的记录之后，就会为其分配一个`普通表的update undo链表`。
-
 - 当事务执行过程中向临时表中插入记录或者执行更新记录主键的操作之后，就会为其分配一个`临时表的insert undo链表`。
-
 - 当事务执行过程中删除或者更新了临时表中的记录之后，就会为其分配一个`临时表的update undo链表`。
 
 &emsp;&emsp;总结一句就是：<span style="color:red">按需分配，什么时候需要什么时候再分配，不需要就不分配</span>。
@@ -112,19 +100,14 @@
 - `trx 1`对普通表做了`DELETE`操作，对临时表做了`INSERT`和`UPDATE`操作。
 
     `InnoDB`会为`trx 1`分配3个链表，分别是：
-    
     - 针对普通表的`update undo链表`
-    
     - 针对临时表的`insert undo链表`
-    
     - 针对临时表的`update undo链表`。
     
 - `trx 2`对普通表做了`INSERT`、`UPDATE`和`DELETE`操作，没有对临时表做改动。
 
     `InnoDB`会为`trx 2`分配2个链表，分别是：
-    
     - 针对普通表的`insert undo链表`
-    
     - 针对普通表的`update undo链表`。
 
 &emsp;&emsp;综上所述，在`trx 1`和`trx 2`执行过程中，`InnoDB`共需为这两个事务分配5个`Undo页面`链表，画个图就是这样：
@@ -141,11 +124,8 @@
 ![image_1d7bp5ndt171bb6rkohot41e023.png-75.7kB][11]
 
 &emsp;&emsp;整个`Segment Header`占用10个字节大小，各个属性的意思如下：
-
 - `Space ID of the INODE Entry`：`INODE Entry`结构所在的表空间ID。
-
 - `Page Number of the INODE Entry`：`INODE Entry`结构所在的页面页号。
-
 - `Byte Offset of the INODE Ent`：`INODE Entry`结构在该页面中的偏移量
 
 &emsp;&emsp;知道了表空间ID、页号、页内偏移量，不就可以唯一定位一个`INODE Entry`的地址了么～
@@ -168,15 +148,10 @@
 - `TRX_UNDO_STATE`：本`Undo页面`链表处在什么状态。
 
     一个`Undo Log Segment`可能处在的状态包括：
-    
     - `TRX_UNDO_ACTIVE`：活跃状态，也就是一个活跃的事务正在往这个段里边写入`undo日志`。
-    
     - `TRX_UNDO_CACHED`：被缓存的状态。处在该状态的`Undo页面`链表等待着之后被其他事务重用。
-    
     - `TRX_UNDO_TO_FREE`：对于`insert undo`链表来说，如果在它对应的事务提交之后，该链表不能被重用，那么就会处于这种状态。
-    
     - `TRX_UNDO_TO_PURGE`：对于`update undo`链表来说，如果在它对应的事务提交之后，该链表不能被重用，那么就会处于这种状态。
-    
     - `TRX_UNDO_PREPARED`：包含处于`PREPARE`阶段的事务产生的`undo日志`。
     
     ```
@@ -190,7 +165,6 @@
     ```
     
 - `TRX_UNDO_FSEG_HEADER`：本`Undo页面`链表对应的段的`Segment Header`信息（就是我们上一节介绍的那个10字节结构，通过这个信息可以找到该段对应的`INODE Entry`）。
-
 - `TRX_UNDO_PAGE_LIST`：`Undo页面`链表的基节点。
 
     &emsp;&emsp;我们上面说`Undo页面`的`Undo Page Header`部分有一个12字节大小的`TRX_UNDO_PAGE_NODE`属性，这个属性代表一个`List Node`结构。每一个`Undo页面`都包含`Undo Page Header`结构，这些页面就可以通过这个属性连成一个链表。这个`TRX_UNDO_PAGE_LIST`属性代表着这个链表的基节点，当然这个基节点只存在于`Undo页面`链表的第一个页面，也就是`first undo page`中。
@@ -205,15 +179,10 @@
 ![image_1d7cfr3cjsec64714qgucc1s8s9.png-122.8kB][15]
 
 &emsp;&emsp;哇唔，映入眼帘的又是一大坨属性，我们先大致看一下它们都是什么意思：
-
 - `TRX_UNDO_TRX_ID`：生成本组`undo日志`的事务`id`。
-
 - `TRX_UNDO_TRX_NO`：事务提交后生成的一个需要序号，使用此序号来标记事务的提交顺序（先提交的此序号小，后提交的此序号大）。
-
 - `TRX_UNDO_DEL_MARKS`：标记本组`undo`日志中是否包含由于`Delete mark`操作产生的`undo日志`。
-
 - `TRX_UNDO_LOG_START`：表示本组`undo`日志中第一条`undo日志`的在页面中的偏移量。
-
 - `TRX_UNDO_XID_EXISTS`：本组`undo日志`是否包含XID信息。
 
     ```
@@ -221,11 +190,8 @@
     ```
     
 - `TRX_UNDO_DICT_TRANS`：标记本组`undo日志`是不是由DDL语句产生的。
-
 - `TRX_UNDO_TABLE_ID`：如果`TRX_UNDO_DICT_TRANS`为真，那么本属性表示DDL语句操作的表的`table id`。
-
 - `TRX_UNDO_NEXT_LOG`：下一组的`undo日志`在页面中开始的偏移量。
-
 - `TRX_UNDO_PREV_LOG`：上一组的`undo日志`在页面中开始的偏移量。
 
     ```
@@ -294,7 +260,6 @@
     ```
     
 - `TRX_RSEG_HISTORY_SIZE`：`History`链表占用的页面数量。
-
 - `TRX_RSEG_HISTORY`：`History`链表的基节点。
 
     ```
@@ -302,7 +267,6 @@
     ```
 
 - `TRX_RSEG_FSEG_HEADER`：本`Rollback Segment`对应的10字节大小的`Segment Header`结构，通过它可以找到本段对应的`INODE Entry`。
-
 - `TRX_RSEG_UNDO_SLOTS`：各个`Undo页面`链表的`first undo page`的`页号`集合，也就是`undo slot`集合。
 
     一个页号占用`4`个字节，对于`16KB`大小的页面来说，这个`TRX_RSEG_UNDO_SLOTS`部分共存储了`1024`个`undo slot`，所以共需`1024 × 4 = 4096`个字节。
@@ -313,7 +277,6 @@
 &emsp;&emsp;随着时间的流逝，开始有事务需要分配`Undo页面`链表了，就从回滚段的第一个`undo slot`开始，看看该`undo slot`的值是不是`FIL_NULL`：
 
 - 如果是`FIL_NULL`，那么在表空间中新创建一个段（也就是`Undo Log Segment`），然后从段里申请一个页面作为`Undo页面`链表的`first undo page`，然后把该`undo slot`的值设置为刚刚申请的这个页面的地址，这样也就意味着这个`undo slot`被分配给了这个事务。
-
 - 如果不是`FIL_NULL`，说明该`undo slot`已经指向了一个`undo链表`，也就是说这个`undo slot`已经被别的事务占用了，那就跳到下一个`undo slot`，判断该`undo slot`的值是不是`FIL_NULL`，重复上面的步骤。
 
 &emsp;&emsp;一个`Rollback Segment Header`页面中包含`1024`个`undo slot`，如果这`1024`个`undo slot`的值都不为`FIL_NULL`，这就意味着这`1024`个`undo slot`都已经名花有主（被分配给了某个事务），此时由于新事务无法再获得新的`Undo页面`链表，就会回滚这个事务并且给用户报错：
@@ -331,7 +294,6 @@ Too many active concurrent transactions
     &emsp;&emsp;被缓存的`undo slot`都会被加入到一个链表，根据对应的`Undo页面`链表的类型不同，也会被加入到不同的链表：
     
     - 如果对应的`Undo页面`链表是`insert undo链表`，则该`undo slot`会被加入`insert undo cached链表`。
-    
     - 如果对应的`Undo页面`链表是`update undo链表`，则该`undo slot`会被加入`update undo cached链表`。
     
     &emsp;&emsp;一个回滚段就对应着上述两个`cached链表`，如果有新事务要分配`undo slot`时，先从对应的`cached链表`中找。如果没有被缓存的`undo slot`，才会到回滚段的`Rollback Segment Header`页面中再去找。
@@ -339,7 +301,6 @@ Too many active concurrent transactions
 - 如果该`undo slot`指向的`Undo页面`链表不符合被重用的条件，那么针对该`undo slot`对应的`Undo页面`链表类型不同，也会有不同的处理：
 
     - 如果对应的`Undo页面`链表是`insert undo链表`，则该`Undo页面`链表的`TRX_UNDO_STATE`属性会被设置为`TRX_UNDO_TO_FREE`，之后该`Undo页面`链表对应的段会被释放掉（也就意味着段中的页面可以被挪作他用），然后把该`undo slot`的值设置为`FIL_NULL`。
-    
     - 如果对应的`Undo页面`链表是`update undo链表`，则该`Undo页面`链表的`TRX_UNDO_STATE`属性会被设置为`TRX_UNDO_TO_PRUGE`，则会将该`undo slot`的值设置为`FIL_NULL`，然后将本次事务写入的一组`undo`日志放到所谓的`History链表`中（需要注意的是，这里并不会将`Undo页面`链表对应的段给释放掉，因为这些`undo`日志还有用呢～）。
     
     ```
@@ -364,7 +325,6 @@ Too many active concurrent transactions
 &emsp;&emsp;如果所示，每个8字节的格子其实由两部分组成：
 
 - 4字节大小的`Space ID`，代表一个表空间的ID。
-
 - 4字节大小的`Page number`，代表一个页号。
     
 &emsp;&emsp;也就是说每个8字节大小的`格子`相当于一个指针，指向某个表空间中的某个页面，这些页面就是`Rollback Segment Header`。这里需要注意的一点事，要定位一个`Rollback Segment Header`还需要知道对应的表空间ID，这也就意味着<span style="color:red">不同的回滚段可能分布在不同的表空间中</span>。
@@ -401,13 +361,11 @@ Too many active concurrent transactions
     &emsp;&emsp;使用传说中的`round-robin`（循环使用）方式来分配回滚段。比如当前事务分配了第`0`号回滚段，那么下一个事务就要分配第`33`号回滚段，下下个事务就要分配第`34`号回滚段，简单一点的说就是这些回滚段被轮着分配给不同的事务（就是这么简单粗暴，没什么好说的）。
     
 - 在分配到回滚段后，首先看一下这个回滚段的两个`cached链表`有没有已经缓存了的`undo slot`，比如如果事务做的是`INSERT`操作，就去回滚段对应的`insert undo cached链表`中看看有没有缓存的`undo slot`；如果事务做的是`DELETE`操作，就去回滚段对应的`update undo cached链表`中看看有没有缓存的`undo slot`。如果有缓存的`undo slot`，那么就把这个缓存的`undo slot`分配给该事务。
-
 - 如果没有缓存的`undo slot`可供分配，那么就要到`Rollback Segment Header`页面中找一个可用的`undo slot`分配给当前事务。
 
     &emsp;&emsp;从`Rollback Segment Header`页面中分配可用的`undo slot`的方式我们上面也说过了，就是从第`0`个`undo slot`开始，如果该`undo slot`的值为`FIL_NULL`，意味着这个`undo slot`是空闲的，就把这个`undo slot`分配给当前事务，否则查看第`1`个`undo slot`是否满足条件，依次类推，直到最后一个`undo slot`。如果这`1024`个`undo slot`都没有值为`FIL_NULL`的情况，就直接报错喽（一般不会出现这种情况）～
     
 - 找到可用的`undo slot`后，如果该`undo slot`是从`cached链表`中获取的，那么它对应的`Undo Log Segment`已经分配了，否则的话需要重新分配一个`Undo Log Segment`，然后从该`Undo Log Segment`中申请一个页面作为`Undo页面`链表的`first undo page`。
-
 - 然后事务就可以把`undo日志`写入到上面申请的`Undo页面`链表了！
 
 &emsp;&emsp;对临时表的记录做改动的步骤和上述的一样，就不赘述了。不错需要再次强调一次，<span style="color:red">如果一个事务在执行过程中既对普通表的记录做了改动，又对临时表的记录做了改动，那么需要为这个记录分配2个回滚段。并发执行的不同事务其实也可以被分配相同的回滚段，只要分配不同的undo slot就可以了</span>。
@@ -416,18 +374,13 @@ Too many active concurrent transactions
 
 ### 配置回滚段数量
 &emsp;&emsp;我们前面说系统中一共有`128`个回滚段，其实这只是默认值，我们可以通过启动参数`innodb_rollback_segments`来配置回滚段的数量，可配置的范围是`1~128`。但是这个参数并不会影响针对临时表的回滚段数量，针对临时表的回滚段数量一直是`32`，也就是说：
-
 - 如果我们把`innodb_rollback_segments`的值设置为`1`，那么只会有1个针对普通表的可用回滚段，但是仍然有32个针对临时表的可用回滚段。
-
-- - 如果我们把`innodb_rollback_segments`的值设置为`2～33`之间的数，效果和将其设置为`1`是一样的。
-
+- 如果我们把`innodb_rollback_segments`的值设置为`2～33`之间的数，效果和将其设置为`1`是一样的。
 - 如果我们把`innodb_rollback_segments`设置为大于`33`的数，那么针对普通表的可用回滚段数量就是该值减去32。
 
 ### 配置undo表空间
 &emsp;&emsp;默认情况下，针对普通表设立的回滚段（第`0`号以及第`33~127`号回滚段）都是被分配到系统表空间的。其中的第第`0`号回滚段是一直在系统表空间的，但是第`33~127`号回滚段可以通过配置放到自定义的`undo表空间`中。但是这种配置只能在系统初始化（创建数据目录时）的时候使用，一旦初始化完成，之后就不能再次更改了。我们看一下相关启动参数：
-
 - 通过`innodb_undo_directory`指定`undo表空间`所在的目录，如果没有指定该参数，则默认`undo表空间`所在的目录就是数据目录。
-
 - 通过`innodb_undo_tablespaces`定义`undo表空间`的数量。该参数的默认值为`0`，表明不创建任何`undo表空间`。
 
     &emsp;&emsp;第`33~127`号回滚段可以平均分布到不同的`undo表空间`中。

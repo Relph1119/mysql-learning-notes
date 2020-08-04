@@ -36,9 +36,7 @@ mysql> SHOW TABLES FROM mysql LIKE 'innodb%';
 2 rows in set (0.01 sec)
 ```
 &emsp;&emsp;可以看到，这两个表都位于`mysql`系统数据库下面，其中：
-
 - `innodb_table_stats`存储了关于表的统计数据，每一条记录对应着一个表的统计数据。
-
 - `innodb_index_stats`存储了关于索引的统计数据，每一条记录对应着一个索引的一个统计项的统计数据。
 
 &emsp;&emsp;我们下面的任务就是看一下这两个表里边都有什么以及表里的数据是如何生成的。
@@ -68,11 +66,8 @@ mysql> SELECT * FROM mysql.innodb_table_stats;
 3 rows in set (0.01 sec)
 ```
 &emsp;&emsp;可以看到我们熟悉的`single_table`表的统计信息就对应着`mysql.innodb_table_stats`的第三条记录。几个重要统计信息项的值如下：
-
 - `n_rows`的值是`9693`，表明`single_table`表中大约有`9693`条记录，注意这个数据是估计值。
-
 - `clustered_index_size`的值是`97`，表明`single_table`表的聚簇索引占用97个页面，这个值是也是一个估计值。
-
 - `sum_of_other_index_sizes`的值是`175`，表明`single_table`表的其他索引一共占用175个页面，这个值是也是一个估计值。
 
 #### n_rows统计项的收集
@@ -110,7 +105,6 @@ mysql> SELECT * FROM mysql.innodb_table_stats;
     &emsp;&emsp;在每个索引的根页面的`Page Header`部分都有两个字段：
     
     - `PAGE_BTR_SEG_LEAF`：表示B+树叶子段的`Segment Header`信息。
-    
     - `PAGE_BTR_SEG_TOP`：表示B+树非叶子段的`Segment Header`信息。
     
 - 从叶子节点段和非叶子节点段的`Segment Header`中找到这两个段对应的`INODE Entry`结构。
@@ -184,21 +178,15 @@ mysql> SELECT * FROM mysql.innodb_index_stats WHERE table_name = 'single_table';
 - 先查看`index_name`列，这个列说明该记录是哪个索引的统计信息，从结果中我们可以看出来，`PRIMARY`索引（也就是主键）占了3条记录，`idx_key_part`索引占了6条记录。
 
 - 针对`index_name`列相同的记录，`stat_name`表示针对该索引的统计项名称，`stat_value`展示的是该索引在该统计项上的值，`stat_description`指的是来描述该统计项的含义的。我们来具体看一下一个索引都有哪些统计项：
-
     - `n_leaf_pages`：表示该索引的叶子节点占用多少页面。
-    
     - `size`：表示该索引共占用多少页面。
-    
     - <code>n_diff_pfx<b>NN</b></code>：表示对应的索引列不重复的值有多少。其中的`NN`长得有点儿怪呀，什么意思呢？
     
         &emsp;&emsp;其实`NN`可以被替换为`01`、`02`、`03`... 这样的数字。比如对于`idx_key_part`来说：
         
         - `n_diff_pfx01`表示的是统计`key_part1`这单单一个列不重复的值有多少。
-        
         - `n_diff_pfx02`表示的是统计`key_part1、key_part2`这两个列组合起来不重复的值有多少。
-
         - `n_diff_pfx03`表示的是统计`key_part1、key_part2、key_part3`这三个列组合起来不重复的值有多少。
-
         - `n_diff_pfx04`表示的是统计`key_part1、key_part2、key_part3、id`这四个列组合起来不重复的值有多少。
         
         ```
@@ -336,7 +324,6 @@ mysql> SELECT * FROM mysql.innodb_index_stats WHERE table_name = 'single_table';
     &emsp;&emsp;所以每一个`NULL`值都是独一无二的，也就是说统计索引列不重复的值的数量时，应该把`NULL`值当作一个独立的值，所以`col`列的不重复的值的数量就是：`4`（分别是1、2、NULL、NULL这四个值）。
 
 - 有的人认为其实`NULL`值在业务上就是代表没有，所有的`NULL`值代表的意义是一样的，所以`col`列不重复的值的数量就是：`3`（分别是1、2、NULL这三个值）。
-
 - 有的人认为这`NULL`完全没有意义嘛，所以在统计索引列不重复的值的数量时压根儿不能把它们算进来，所以`col`列不重复的值的数量就是：`2`（分别是1、2这两个值）。
 
 &emsp;&emsp;设计`MySQL`的大佬蛮贴心的，他们提供了一个名为`innodb_stats_method`的系统变量，相当于在计算某个索引列不重复值的数量时如何对待`NULL`值这个锅甩给了用户，这个系统变量有三个候选值：
@@ -356,11 +343,8 @@ mysql> SELECT * FROM mysql.innodb_index_stats WHERE table_name = 'single_table';
 ## 总结
 
 - `InnoDB`以表为单位来收集统计数据，这些统计数据可以是基于磁盘的永久性统计数据，也可以是基于内存的非永久性统计数据。
-
 - `innodb_stats_persistent`控制着使用永久性统计数据还是非永久性统计数据；`innodb_stats_persistent_sample_pages`控制着永久性统计数据的采样页面数量；`innodb_stats_transient_sample_pages`控制着非永久性统计数据的采样页面数量；`innodb_stats_auto_recalc`控制着是否自动重新计算统计数据。
-
 - 我们可以针对某个具体的表，在创建和修改表时通过指定`STATS_PERSISTENT`、`STATS_AUTO_RECALC`、`STATS_SAMPLE_PAGES`的值来控制相关统计数据属性。
-
 - `innodb_stats_method`决定着在统计某个索引列不重复值的数量时如何对待`NULL`值。
 
   [1]: ../images/13-01.png
