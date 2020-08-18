@@ -4,7 +4,7 @@
 ## 通用链表结构
 &emsp;&emsp;在写入`undo日志`的过程中会使用到多个链表，很多链表都有同样的节点结构，如图所示：
 
-![image_1d79gnaudfg2psk2l7mi1146r20.png-104.8kB][1]
+![][23-01]
 
 &emsp;&emsp;在某个表空间内，我们可以通过一个页的页号和在页内的偏移量来唯一定位一个节点的位置，这两个信息也就相当于指向这个节点的一个指针。所以：
 - `Pre Node Page Number`和`Pre Node Offset`的组合就是指向前一个节点的指针
@@ -14,7 +14,7 @@
 
 &emsp;&emsp;为了更好的管理链表，设计`InnoDB`的大佬还提出了一个基节点的结构，里边存储了这个链表的`头节点`、`尾节点`以及链表长度信息，基节点的结构示意图如下：
 
-![image_1d79o8ra61jh6k0k6af13vpg329.png-103.9kB][2]
+![][23-02]
 
 其中：
 - `List Length`表明该链表一共有多少节点。
@@ -25,7 +25,7 @@
 
 &emsp;&emsp;所以使用`List Base Node`和`List Node`这两个结构组成的链表的示意图就是这样：
 
-![image_1d79nq0ge1gn7pmcaa7gma1uh62q.png-71kB][3]
+![][23-03]
 
 ```
 小贴士：上述链表结构我们在前面的文章中频频提到，尤其是在表空间那一章重点描述过，不过我不敢奢求大家都记住了，所以在这里又强调一遍，希望大家不要嫌我烦，我只是怕大家忘了学习后续内容吃力而已～
@@ -34,11 +34,11 @@
 ## FIL_PAGE_UNDO_LOG页面
 &emsp;&emsp;我们前面介绍表空间的时候说过，表空间其实是由许许多多的页面构成的，页面默认大小为`16KB`。这些页面有不同的类型，比如类型为`FIL_PAGE_INDEX`的页面用于存储聚簇索引以及二级索引，类型为`FIL_PAGE_TYPE_FSP_HDR`的页面用于存储表空间头部信息的，还有其他各种类型的页面，其中有一种称之为`FIL_PAGE_UNDO_LOG`类型的页面是专门用来存储`undo日志`的，这种类型的页面的通用结构如下图所示（以默认的`16KB`大小为例）：
 
-![image_1d79ec33apm47brq901sur3bi16.png-63.2kB][4]
+![][23-04]
 
 &emsp;&emsp;“类型为`FIL_PAGE_UNDO_LOG`的页”这种说法太绕口，以后我们就简称为`Undo页面`了。上图中的`File Header`和`File Trailer`是各种页面都有的通用结构，我们前面介绍过很多遍了，这里就不赘述了（忘记了的可以到讲述数据页结构或者表空间的章节中查看）。`Undo Page Header`是`Undo页面`所特有的，我们来看一下它的结构：
 
-![image_1d79ohe8u1uqgh1e978nji1ip2m.png-71.8kB][5]
+![][23-05]
 
 &emsp;&emsp;其中各个属性的意思如下：
 
@@ -60,7 +60,7 @@
     
     &emsp;&emsp;假设现在向页面中写入了3条`undo日志`，那么`TRX_UNDO_PAGE_START`和`TRX_UNDO_PAGE_FREE`的示意图就是这样：
 
-    ![image_1d79s1ib21rku5fkq3to1e14313.png-54kB][6]
+    ![][23-06]
 
     &emsp;&emsp;当然，在最初一条`undo日志`也没写入的情况下，`TRX_UNDO_PAGE_START`和`TRX_UNDO_PAGE_FREE`的值是相同的。
     
@@ -73,17 +73,17 @@
 ### 单个事务中的Undo页面链表
 &emsp;&emsp;因为一个事务可能包含多个语句，而且一个语句可能对若干条记录进行改动，而对每条记录进行改动前，都需要记录1条或2条的`undo日志`，所以在一个事务执行过程中可能产生很多`undo日志`，这些日志可能一个页面放不下，需要放到多个页面中，这些页面就通过我们上面介绍的`TRX_UNDO_PAGE_NODE`属性连成了链表：
 
-![image_1d79v7bib12041n9d1gpe1t8a10jc1g.png-60.8kB][7]
+![][23-07]
 
 &emsp;&emsp;大家往上再瞅一瞅上面的图，我们特意把链表中的第一个`Undo页面`给标了出来，称它为`first undo page`，其余的`Undo页面`称之为`normal undo page`，这是因为在`first undo page`中除了记录`Undo Page Header`之外，还会记录其他的一些管理信息，这个我们稍后再说。
 
 &emsp;&emsp;在一个事务执行过程中，可能混着执行`INSERT`、`DELETE`、`UPDATE`语句，也就意味着会产生不同类型的`undo日志`。但是我们前面又强调过，同一个`Undo页面`要么只存储`TRX_UNDO_INSERT`大类的`undo日志`，要么只存储`TRX_UNDO_UPDATE`大类的`undo日志`，反正不能混着存，所以在一个事务执行过程中就可能需要2个`Undo页面`的链表，一个称之为`insert undo链表`，另一个称之为`update undo链表`，画个示意图就是这样：
 
-![image_1d7a6t4va1e0c1l9t1hq51vlt183l2d.png-54.6kB][8]
+![][23-08]
 
 &emsp;&emsp;另外，设计`InnoDB`的大佬规定对普通表和临时表的记录改动时产生的`undo日志`要分别记录（我们稍后阐释为什么这么做），所以在一个事务中<span style="color:red">最多</span>有4个以`Undo页面`为节点组成的链表：
 
-![image_1d7bg5o7c3t11nch988lj51hsl9.png-106.8kB][9]
+![][23-09]
 
 &emsp;&emsp;当然，并不是在事务一开始就会为这个事务分配这4个链表，具体分配策略如下：
 - 刚刚开启事务时，一个`Undo页面`链表也不分配。
@@ -112,7 +112,7 @@
 
 &emsp;&emsp;综上所述，在`trx 1`和`trx 2`执行过程中，`InnoDB`共需为这两个事务分配5个`Undo页面`链表，画个图就是这样：
 
-![image_1d7blo9dp1m4tj1f1ke9te11654m.png-96.8kB][10]
+![][23-10]
 
 &emsp;&emsp;如果有更多的事务，那就意味着可能会产生更多的`Undo页面`链表。
 
@@ -121,7 +121,7 @@
 ### 段（Segment）的概念
 &emsp;&emsp;如果你有认真看过表空间那一章的话，对这个`段`的概念应该印象深刻，我们当时花了非常大的篇幅来介绍这个概念。简单讲，这个`段`是一个逻辑上的概念，本质上是由若干个零散页面和若干个完整的区组成的。比如一个`B+`树索引被划分成两个段，一个叶子节点段，一个非叶子节点段，这样叶子节点就可以被尽可能的存到一起，非叶子节点被尽可能的存到一起。每一个段对应一个`INODE Entry`结构，这个`INODE Entry`结构描述了这个段的各种信息，比如段的`ID`，段内的各种链表基节点，零散页面的页号有哪些等信息（具体该结构中每个属性的意思大家可以到表空间那一章里再次重温一下）。我们前面也说过，为了定位一个`INODE Entry`，设计`InnoDB`的大佬设计了一个`Segment Header`的结构：
 
-![image_1d7bp5ndt171bb6rkohot41e023.png-75.7kB][11]
+![][23-11]
 
 &emsp;&emsp;整个`Segment Header`占用10个字节大小，各个属性的意思如下：
 - `Space ID of the INODE Entry`：`INODE Entry`结构所在的表空间ID。
@@ -137,11 +137,11 @@
 ### Undo Log Segment Header
 &emsp;&emsp;设计`InnoDB`的大佬规定，每一个`Undo页面`链表都对应着一个`段`，称之为`Undo Log Segment`。也就是说链表中的页面都是从这个段里边申请的，所以他们在`Undo页面`链表的第一个页面，也就是上面提到的`first undo page`中设计了一个称之为`Undo Log Segment Header`的部分，这个部分中包含了该链表对应的段的`segment header`信息以及其他的一些关于这个段的信息，所以`Undo`页面链表的第一个页面其实长这样：
 
-![image_1d7brcccqah1rdn10573vh1onip.png-70.5kB][12]
+![][23-12]
 
 &emsp;&emsp;可以看到这个`Undo`链表的第一个页面比普通页面多了个`Undo Log Segment Header`，我们来看一下它的结构：
 
-![image_1d7bsbk8o15ja2bk1s9p11c51vs2p.png-80.2kB][13]
+![][23-13]
 
 其中各个属性的意思如下：
 
@@ -172,11 +172,11 @@
 ### Undo Log Header
 &emsp;&emsp;一个事务在向`Undo页面`中写入`undo日志`时的方式是十分简单暴力的，就是直接往里怼，写完一条紧接着写另一条，各条`undo日志`之间是亲密无间的。写完一个`Undo页面`后，再从段里申请一个新页面，然后把这个页面插入到`Undo页面`链表中，继续往这个新申请的页面中写。设计`InnoDB`的大佬认为同一个事务向一个`Undo页面`链表中写入的`undo日志`算是一个组，比方说我们上面介绍的`trx 1`由于会分配3个`Undo页面`链表，也就会写入3个组的`undo日志`；`trx 2`由于会分配2个`Undo页面`链表，也就会写入2个组的`undo日志`。在每写入一组`undo日志`时，都会在这组`undo日志`前先记录一下关于这个组的一些属性，设计`InnoDB`的大佬把存储这些属性的地方称之为`Undo Log Header`。所以`Undo页面`链表的第一个页面在真正写入`undo日志`前，其实都会被填充`Undo Page Header`、`Undo Log Segment Header`、`Undo Log Header`这3个部分，如图所示：
 
-![image_1d7cbktqb16oqih12mqmghn2a1m.png-82kB][14]
+![][23-14]
 
 这个`Undo Log Header`具体的结构如下：
 
-![image_1d7cfr3cjsec64714qgucc1s8s9.png-122.8kB][15]
+![][23-15]
 
 &emsp;&emsp;哇唔，映入眼帘的又是一大坨属性，我们先大致看一下它们都是什么意思：
 - `TRX_UNDO_TRX_ID`：生成本组`undo日志`的事务`id`。
@@ -207,7 +207,7 @@
 ### 小结
 &emsp;&emsp;对于没有被重用的`Undo页面`链表来说，链表的第一个页面，也就是`first undo page`在真正写入`undo日志`前，会填充`Undo Page Header`、`Undo Log Segment Header`、`Undo Log Header`这3个部分，之后才开始正式写入`undo日志`。对于其他的页面来说，也就是`normal undo page`在真正写入`undo日志`前，只会填充`Undo Page Header`。链表的`List Base Node`存放到`first undo page`的`Undo Log Segment Header`部分，`List Node`信息存放到每一个`Undo页面`的`undo Page Header`部分，所以画一个`Undo页面`链表的示意图就是这样：
 
-![image_1d7cocjrk1dvm1ehg16da1di4mfb16.png-87kB][16]
+![][23-16]
 
 ## 重用Undo页面
 &emsp;&emsp;我们前面说为了能提高并发执行的多个事务写入`undo日志`的性能，设计`InnoDB`的大佬决定为每个事务单独分配相应的`Undo页面`链表（最多可能单独分配4个链表）。但是这样也造成了一些问题，比如其实大部分事务执行过程中可能只修改了一条或几条记录，针对某个`Undo页面`链表只产生了非常少的`undo日志`，这些`undo日志`可能只占用一丢丢存储空间，每开启一个事务就新创建一个`Undo页面`链表（虽然这个链表中只有一个页面）来存储这么一丢丢`undo日志`岂不是太浪费了么？的确是挺浪费，于是设计`InnoDB`的大佬本着勤俭节约的优良传统，决定在事务提交后在某些情况下重用该事务的`Undo页面`链表。一个`Undo页面`链表是否可以被重用的条件很简单：
@@ -224,7 +224,7 @@
 
     &emsp;&emsp;`insert undo链表`中只存储类型为`TRX_UNDO_INSERT_REC`的`undo日志`，这种类型的`undo日志`在事务提交之后就没用了，就可以被清除掉。所以在某个事务提交后，重用这个事务的`insert undo链表`（这个链表中只有一个页面）时，可以直接把之前事务写入的一组`undo日志`覆盖掉，从头开始写入新事务的一组`undo日志`，如下图所示：
 
-    ![image_1d7el7sg0pje14rjc06rp51r8r1m.png-91.7kB][17]
+    ![][23-17]
     
     &emsp;&emsp;如图所示，假设有一个事务使用的`insert undo链表`，到事务提交时，只向`insert undo链表`中插入了3条`undo日志`，这个`insert undo链表`只申请了一个`Undo页面`。假设此刻该页面已使用的空间小于整个页面大小的3/4，那么下一个事务就可以重用这个`insert undo链表`（链表中只有一个页面）。假设此时有一个新事务重用了该`insert undo链表`，那么可以直接把旧的一组`undo日志`覆盖掉，写入一组新的`undo日志`。
     
@@ -236,7 +236,7 @@
 
     &emsp;&emsp;在一个事务提交后，它的`update undo链表`中的`undo日志`也不能立即删除掉（这些日志用于MVCC，我们后边会说的）。所以如果之后的事务想重用`update undo链表`时，就不能覆盖之前事务写入的`undo日志`。这样就相当于在同一个`Undo页面`中写入了多组的`undo日志`，效果看起来就是这样：
     
-    ![image_1d7elkmtjdbv1kth1c9jk17is123.png-126.3kB][18]
+    ![][23-18]
 
 
 ## 回滚段
@@ -246,7 +246,7 @@
 
 &emsp;&emsp;我们看一下这个称之为`Rollback Segment Header`的页面长什么样（以默认的16KB为例）：
 
-![image_1d7gs2k8u1i9i15r71dg97fj10jv9.png-88kB][19]
+![][23-19]
 
 &emsp;&emsp;设计`InnoDB`的大佬规定，每一个`Rollback Segment Header`页面都对应着一个段，这个段就称为`Rollback Segment`，翻译过来就是`回滚段`。与我们之前介绍的各种段不同的是，这个`Rollback Segment`里其实只有一个页面（这可能是设计`InnoDB`的大佬们的一种洁癖，他们可能觉得为了某个目的去分配页面的话都得先申请一个段，或者他们觉得虽然目前版本的`MySQL`里`Rollback Segment`里其实只有一个页面，但可能之后的版本里会增加页面也说不定）。
 
@@ -316,11 +316,11 @@ Too many active concurrent transactions
 ```
 &emsp;&emsp;每个回滚段都对应着一个`Rollback Segment Header`页面，有128个回滚段，自然就要有128个`Rollback Segment Header`页面，这些页面的地址总得找个地方存一下吧！于是设计`InnoDB`的大佬在系统表空间的第`5`号页面的某个区域包含了128个8字节大小的格子： 
 
-![image_1d7214jha1cua1dgu1r6718091gbfm.png-27.4kB][20]
+![][23-20]
 
 &emsp;&emsp;每个8字节的格子的构造就像这样：
 
-![image_1d721oblche9a4pmng15p1dk313.png-9.9kB][21]
+![][23-21]
     
 &emsp;&emsp;如果所示，每个8字节的格子其实由两部分组成：
 
@@ -331,7 +331,7 @@ Too many active concurrent transactions
 
 &emsp;&emsp;所以通过上面的叙述我们可以大致清楚，在系统表空间的第`5`号页面中存储了128个`Rollback Segment Header`页面地址，每个`Rollback Segment Header`就相当于一个回滚段。在`Rollback Segment Header`页面中，又包含`1024`个`undo slot`，每个`undo slot`都对应一个`Undo页面`链表。我们画个示意图：
 
-![image_1d7h72gvlin31far16h11elj16tu1m.png-97kB][22]
+![][23-22]
 
 把图一画出来就清爽多了。
 
@@ -392,25 +392,28 @@ Too many active concurrent transactions
 
 &emsp;&emsp;设立`undo表空间`的一个好处就是在`undo表空间`中的文件大到一定程度时，可以自动的将该`undo表空间`截断（truncate）成一个小文件。而系统表空间的大小只能不断的增大，却不能截断。
 
-  [1]: ../images/23-01.png
-  [2]: ../images/23-02.png
-  [3]: ../images/23-03.png
-  [4]: ../images/23-04.png
-  [5]: ../images/23-05.png
-  [6]: ../images/23-06.png
-  [7]: ../images/23-07.png
-  [8]: ../images/23-08.png
-  [9]: ../images/23-09.png
-  [10]: ../images/23-10.png
-  [11]: ../images/23-11.png
-  [12]: ../images/23-12.png
-  [13]: ../images/23-13.png
-  [14]: ../images/23-14.png
-  [15]: ../images/23-15.png
-  [16]: ../images/23-16.png
-  [17]: ../images/23-17.png
-  [18]: ../images/23-18.png
-  [19]: ../images/23-19.png
-  [20]: ../images/23-20.png
-  [21]: ../images/23-21.png
-  [22]: ../images/23-22.png
+  [23-01]: ../images/23-01.png
+  [23-02]: ../images/23-02.png
+  [23-03]: ../images/23-03.png
+  [23-04]: ../images/23-04.png
+  [23-05]: ../images/23-05.png
+  [23-06]: ../images/23-06.png
+  [23-07]: ../images/23-07.png
+  [23-08]: ../images/23-08.png
+  [23-09]: ../images/23-09.png
+  [23-10]: ../images/23-10.png
+  [23-11]: ../images/23-11.png
+  [23-12]: ../images/23-12.png
+  [23-13]: ../images/23-13.png
+  [23-14]: ../images/23-14.png
+  [23-15]: ../images/23-15.png
+  [23-16]: ../images/23-16.png
+  [23-17]: ../images/23-17.png
+  [23-18]: ../images/23-18.png
+  [23-19]: ../images/23-19.png
+  [23-20]: ../images/23-20.png
+  [23-21]: ../images/23-21.png
+  [23-22]: ../images/23-22.png
+  
+<div STYLE="page-break-after: always;"></div>
+

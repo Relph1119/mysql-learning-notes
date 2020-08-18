@@ -220,3 +220,6 @@ test.MYI
     &emsp;&emsp;这个数据库主要是通过视图的形式把`information_schema `和`performance_schema`结合起来，让程序员可以更方便的了解MySQL服务器的一些性能信息。
 
 &emsp;&emsp;什么？这四个系统数据库这就介绍完了？是的，我们的标题写的就是`简介`嘛！如果真的要介绍一下这几个系统库的使用，那怕是又要写一本书了... 这里只是因为介绍数据目录里遇到了，为了内容的完整性跟大家提一下，具体如何使用还是要参照文档～
+
+<div STYLE="page-break-after: always;"></div>
+

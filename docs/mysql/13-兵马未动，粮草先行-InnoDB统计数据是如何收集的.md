@@ -111,19 +111,19 @@ mysql> SELECT * FROM mysql.innodb_table_stats;
 
     这个是`Segment Header`结构：
     
-    ![image_1cum7dbc812843ac192pfik1raep.png-107.3kB][1]
+    ![][13-01]
 
 - 从对应的`INODE Entry`结构中可以找到该段对应所有零散的页面地址以及`FREE`、`NOT_FULL`、`FULL`链表的基节点。
     
     这个是`INODE Entry`结构：
 
-    ![image_1cum7f49h1beg5uccbq197n1g1b16.png-173.9kB][2]
+    ![][13-02]
     
 - 直接统计零散的页面有多少个，然后从那三个链表的`List Length`字段中读出该段占用的区的大小，每个区占用`64`个页，所以就可以统计出整个段占用的页面。    
 
     这个是链表基节点的示意图：
     
-    ![image_1cum7hkiihikm4b88j10461plc1j.png-129.9kB][3]
+    ![][13-03]
     
 - 分别计算聚簇索引的叶子结点段和非叶子节点段占用的页面数，它们的和就是`clustered_index_size`的值，按照同样的套路把其余索引占用的页面数都算出来，加起来之后就是`sum_of_other_index_sizes`的值。
 
@@ -347,6 +347,9 @@ mysql> SELECT * FROM mysql.innodb_index_stats WHERE table_name = 'single_table';
 - 我们可以针对某个具体的表，在创建和修改表时通过指定`STATS_PERSISTENT`、`STATS_AUTO_RECALC`、`STATS_SAMPLE_PAGES`的值来控制相关统计数据属性。
 - `innodb_stats_method`决定着在统计某个索引列不重复值的数量时如何对待`NULL`值。
 
-  [1]: ../images/13-01.png
-  [2]: ../images/13-02.png
-  [3]: ../images/13-03.png
+  [13-01]: ../images/13-01.png
+  [13-02]: ../images/13-02.png
+  [13-03]: ../images/13-03.png
+  
+<div STYLE="page-break-after: always;"></div>
+

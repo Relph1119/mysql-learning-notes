@@ -460,3 +460,6 @@ Create Table: CREATE TABLE `engine_demo_table` (
 mysql>
 ```
 &emsp;&emsp;可以看到该表的存储引擎已经改为`InnoDB`了。
+
+<div STYLE="page-break-after: always;"></div>
+

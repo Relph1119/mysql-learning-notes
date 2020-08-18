@@ -38,7 +38,7 @@
 
 &emsp;&emsp;从上面的描述中可以看到，磁盘上的`redo`日志文件不只一个，而是以一个`日志文件组`的形式出现的。这些文件以`ib_logfile[数字]`（`数字`可以是`0`、`1`、`2`...）的形式进行命名。在将`redo`日志写入`日志文件组`时，是从`ib_logfile0`开始写，如果`ib_logfile0`写满了，就接着`ib_logfile1`写，同理，`ib_logfile1`写满了就去写`ib_logfile2`，依此类推。如果写到最后一个文件该咋办？那就重新转到`ib_logfile0`继续写，所以整个过程如下图所示：
 
-![image_1d4mu4s6f7491l7l1jcc6pc1rbk16.png-49.7kB][1]
+![][21-01]
 
 &emsp;&emsp;总共的`redo`日志文件大小其实就是：`innodb_log_file_size × innodb_log_files_in_group`。
 ```
@@ -55,16 +55,16 @@
 
 &emsp;&emsp;所以我们前面所说的`循环`使用redo日志文件，其实是从每个日志文件的第2048个字节开始算，画个示意图就是这样：
 
-![image_1d4njgt351je21kitk7u1gbioa46j.png-64.9kB][2]
+![][21-02]
 
 &emsp;&emsp;普通block的格式我们在介绍`log buffer`的时候都说过了，就是`log block header`、`log block body`、`log block trialer`这三个部分，就不重复介绍了。这里需要介绍一下每个`redo`日志文件前2048个字节，也就是前4个特殊block的格式都是干嘛的，废话少说，先看图：
 
-![image_1d4n63euu1t3u1ten1tgicecsar4c.png-51.1kB][3]    
+![][21-03]    
 &emsp;&emsp;从图中可以看出来，这4个block分别是：
 
 - `log file header`：描述该`redo`日志文件的一些整体属性，看一下它的结构：
 
-    ![image_1d4nfhoa914vbne4kao7cstr95m.png-65.5kB][4]
+    ![][21-04]
     
     &emsp;&emsp;各个属性的具体释义如下：
     
@@ -82,7 +82,7 @@
     
 - `checkpoint1`：记录关于`checkpoint`的一些属性，看一下它的结构：
 
-    ![image_1d4njq08pd2a5j9pc01qcn2ps7g.png-60.1kB][5]
+    ![][21-05]
 
     各个属性的具体释义如下：
     
@@ -109,17 +109,17 @@
 
 - 系统第一次启动后初始化`log buffer`时，`buf_free`（就是标记下一条`redo`日志应该写入到`log buffer`的位置的变量）就会指向第一个`block`的偏移量为12字节（`log block header`的大小）的地方，那么`lsn`值也会跟着增加12：
 
-    ![image_1d4v2r59mr10jdl1vs4fk61huv79.png-50.9kB][6]
+    ![][21-06]
 
 - 如果某个`mtr`产生的一组`redo`日志占用的存储空间比较小，也就是待插入的block剩余空闲空间能容纳这个`mtr`提交的日志时，`lsn`增长的量就是该`mtr`生成的`redo`日志占用的字节数，就像这样：
 
-    ![image_1d4v57vgl1obr1kfcfuunp44bo2t.png-54kB][7]
+    ![][21-07]
 
     &emsp;&emsp;我们假设上图中`mtr_1`产生的`redo`日志量为200字节，那么`lsn`就要在`8716`的基础上增加`200`，变为`8916`。
 
 - 如果某个`mtr`产生的一组`redo`日志占用的存储空间比较大，也就是待插入的block剩余空闲空间不足以容纳这个`mtr`提交的日志时，`lsn`增长的量就是该`mtr`生成的`redo`日志占用的字节数加上额外占用的`log block header`和`log block trailer`的字节数，就像这样：
 
-    ![image_1d4v37u011jhc1rpa1fpi5a82ca9.png-99.3kB][8]
+    ![][21-08]
                             
     &emsp;&emsp;我们假设上图中`mtr_2`产生的`redo`日志量为1000字节，为了将`mtr_2`产生的`redo`日志写入`log buffer`，我们不得不额外多分配两个block，所以`lsn`的值需要在`8916`的基础上增加`1000 + 12×2 + 4 × 2 = 1032`。
     
@@ -131,7 +131,7 @@
 ### flushed_to_disk_lsn
 &emsp;&emsp;`redo`日志是首先写到`log buffer`中，之后才会被刷新到磁盘上的`redo`日志文件。所以设计`InnoDB`的大佬提出了一个称之为`buf_next_to_write`的全局变量，标记当前`log buffer`中已经有哪些日志被刷新到磁盘中了。画个图表示就是这样：
 
-![image_1d4q3upvq17n8cargmibugve29.png-84.3kB][9]
+![][21-09]
 
 &emsp;&emsp;我们前面说`lsn`是表示当前系统中写入的`redo`日志量，这包括了写到`log buffer`而没有刷新到磁盘的日志，相应的，设计`InnoDB`的大佬提出了一个表示刷新到磁盘中的`redo`日志量的全局变量，称之为`flushed_to_disk_lsn`。系统第一次启动时，该变量的值和初始的`lsn`值是相同的，都是`8704`。随着系统的运行，`redo`日志被不断写入`log buffer`，但是并不会立即刷新到磁盘，`lsn`的值就和`flushed_to_disk_lsn`的值拉开了差距。我们演示一下：
 
@@ -143,11 +143,11 @@
 
     &emsp;&emsp;此时的`lsn`已经增长到了10000，但是由于没有刷新操作，所以此时`flushed_to_disk_lsn`的值仍为`8704`，如图：
 
-    ![image_1d4v3ubbacgm13171s481trb6kj1m.png-88.5kB][10]
+    ![][21-10]
     
 - 随后进行将`log buffer`中的block刷新到`redo`日志文件的操作，假设将`mtr_1`和`mtr_2`的日志刷新到磁盘，那么`flushed_to_disk_lsn`就应该增长`mtr_1`和`mtr_2`写入的日志量，所以`flushed_to_disk_lsn`的值增长到了`9948`，如图：
 
-    ![image_1d4v40upc1tnt1dpe1l14u2ar4n23.png-100.2kB][11]
+    ![][21-11]
 
 &emsp;&emsp;综上所述，当有新的`redo`日志写入到`log buffer`时，首先`lsn`的值会增长，但`flushed_to_disk_lsn`不变，随后随着不断有`log buffer`中的日志被刷新到磁盘上，`flushed_to_disk_lsn`的值也跟着增长。<span style="color:red">如果两者的值相同时，说明log buffer中的所有redo日志都已经刷新到磁盘中了</span>。
 
@@ -158,14 +158,14 @@
 ### lsn值和redo日志文件偏移量的对应关系
 &emsp;&emsp;因为`lsn`的值是代表系统写入的`redo`日志量的一个总和，一个`mtr`中产生多少日志，`lsn`的值就增加多少（当然有时候要加上`log block header`和`log block trailer`的大小），这样`mtr`产生的日志写到磁盘中时，很容易计算某一个`lsn`值在`redo`日志文件组中的偏移量，如图：
 
-![image_1d4v5sdrj1p1jrhmnfrq4pa073n.png-49.3kB][12]
+![][21-12]
 
 &emsp;&emsp;初始时的`LSN`值是`8704`，对应文件偏移量`2048`，之后每个`mtr`向磁盘中写入多少字节日志，`lsn`的值就增长多少。
 
 ### flush链表中的LSN
 &emsp;&emsp;我们知道一个`mtr`代表一次对底层页面的原子访问，在访问过程中可能会产生一组不可分割的`redo`日志，在`mtr`结束时，会把这一组`redo`日志写入到`log buffer`中。除此之外，在`mtr`结束时还有一件非常重要的事情要做，就是<span style="color:red">把在mtr执行过程中可能修改过的页面加入到Buffer Pool的flush链表</span>。为了防止大家早已忘记`flush链表`是什么，我们再看一下图：
 
-![image_1d4uln1ejrt4cerr6h1tc41uok3k.png-227kB][13]
+![][21-13]
         
 &emsp;&emsp;当第一次修改某个缓存在`Buffer Pool`中的页面时，就会把这个页面对应的控制块插入到`flush链表`的头部，之后再修改该页面时由于它已经在`flush`链表中了，就不再次插入了。也就是说<span style="color:red">flush链表中的脏页是按照页面的第一次修改时间从大到小进行排序的</span>。在这个过程中会在缓存页对应的控制块中记录两个关于页面何时修改的属性：
 
@@ -177,28 +177,28 @@
 
 - 假设`mtr_1`执行过程中修改了`页a`，那么在`mtr_1`执行结束时，就会将`页a`对应的控制块加入到`flush链表`的头部。并且将`mtr_1`开始时对应的`lsn`，也就是`8716`写入`页a`对应的控制块的`oldest_modification`属性中，把`mtr_1`结束时对应的`lsn`，也就是8916写入`页a`对应的控制块的`newest_modification`属性中。画个图表示一下（为了让图片美观一些，我们把`oldest_modification`缩写成了`o_m`，把`newest_modification`缩写成了`n_m`）：
 
-    ![image_1d4v63pct1v9o14l3812gnj11de44.png-31.8kB][14]
+    ![][21-14]
     
 - 接着假设`mtr_2`执行过程中又修改了`页b`和`页c`两个页面，那么在`mtr_2`执行结束时，就会将`页b`和`页c`对应的控制块都加入到`flush链表`的头部。并且将`mtr_2`开始时对应的`lsn`，也就是8916写入`页b`和`页c`对应的控制块的`oldest_modification`属性中，把`mtr_2`结束时对应的`lsn`，也就是9948写入`页b`和`页c`对应的控制块的`newest_modification`属性中。画个图表示一下：
 
-    ![image_1d4v64vte14tq1oc911s1v8gnn51.png-59.4kB][15]
+    ![][21-15]
 
     &emsp;&emsp;从图中可以看出来，每次新插入到`flush链表`中的节点都是被放在了头部，也就是说`flush链表`中前面的脏页修改的时间比较晚，后边的脏页修改时间比较早。
     
 - 接着假设`mtr_3`执行过程中修改了`页b`和`页d`，不过`页b`之前已经被修改过了，所以它对应的控制块已经被插入到了`flush`链表，所以在`mtr_3`执行结束时，只需要将`页d`对应的控制块都加入到`flush链表`的头部即可。所以需要将`mtr_3`开始时对应的`lsn`，也就是9948写入`页d`对应的控制块的`oldest_modification`属性中，把`mtr_3`结束时对应的`lsn`，也就是10000写入`页d`对应的控制块的`newest_modification`属性中。另外，由于`页b`在`mtr_3`执行过程中又发生了一次修改，所以需要更新`页b`对应的控制块中`newest_modification`的值为10000。画个图表示一下：
 
-    ![image_1d4v68bhl1jb9r8m6vn1b157cn5e.png-110.8kB][16]
+    ![][21-16]
 
 &emsp;&emsp;总结一下上面说的，就是：<span style="color:red">flush链表中的脏页按照修改发生的时间顺序进行排序，也就是按照oldest_modification代表的LSN值进行排序，被多次更新的页面不会重复插入到flush链表中，但是会更新newest_modification属性的值</span>。
 
 ## checkpoint
 &emsp;&emsp;有一个很不幸的事实就是我们的`redo`日志文件组容量是有限的，我们不得不选择循环使用`redo`日志文件组中的文件，但是这会造成最后写的`redo`日志与最开始写的`redo`日志`追尾`，这时应该想到：<span style="color:red">redo日志只是为了系统奔溃后恢复脏页用的，如果对应的脏页已经刷新到了磁盘，也就是说即使现在系统奔溃，那么在重启后也用不着使用redo日志恢复该页面了，所以该redo日志也就没有存在的必要了，那么它占用的磁盘空间就可以被后续的redo日志所重用</span>。也就是说：<span style="color:red">判断某些redo日志占用的磁盘空间是否可以覆盖的依据就是它对应的脏页是否已经刷新到磁盘里</span>。我们看一下前面一直介绍的那个例子：
 
-![image_1d4v6epcasjm11u4l131nj41vgs68.png-112.1kB][17]
+![][21-17]
 
 &emsp;&emsp;如图，虽然`mtr_1`和`mtr_2`生成的`redo`日志都已经被写到了磁盘上，但是它们修改的脏页仍然留在`Buffer Pool`中，所以它们生成的`redo`日志在磁盘上的空间是不可以被覆盖的。之后随着系统的运行，如果`页a`被刷新到了磁盘，那么它对应的控制块就会从`flush链表`中移除，就像这样子：
 
-![image_1d4v6h6kp7311ni21mkn1ejkm397i.png-99.3kB][18]
+![][21-18]
 
 &emsp;&emsp;这样`mtr_1`生成的`redo`日志就没有用了，它们占用的磁盘空间就可以被覆盖掉了。设计`InnoDB`的大佬提出了一个全局变量`checkpoint_lsn`来代表当前系统中可以被覆盖的`redo`日志总量是多少，这个变量初始值也是`8704`。
 
@@ -218,7 +218,7 @@
 
 &emsp;&emsp;记录完`checkpoint`的信息之后，`redo`日志文件组中各个`lsn`值的关系就像这样：
 
-![image_1d678eiie125j1flp1tc617jp1dvo9.png-68.1kB][19]
+![][21-19]
 
 ### 批量从flush链表中刷出脏页
 &emsp;&emsp;我们在介绍`Buffer Pool`的时候说过，一般情况下都是后台的线程在对`LRU链表`和`flush链表`进行刷脏操作，这主要因为刷脏操作比较慢，不想影响用户线程处理请求。但是如果当前系统修改页面的操作十分频繁，这样就导致写日志操作十分频繁，系统`lsn`值增长过快。如果后台的刷脏操作不能将脏页刷出，那么系统无法及时做`checkpoint`，可能就需要用户线程同步的从`flush链表`中把那些最早修改的脏页（`oldest_modification`最小的脏页）刷新到磁盘，这样这些脏页对应的`redo`日志就没用了，然后就可以去做`checkpoint`了。
@@ -270,14 +270,14 @@ Last checkpoint at  124052494
 ### 确定恢复的终点
 &emsp;&emsp;`redo`日志恢复的起点确定了，那终点是哪个呢？这个还得从block的结构说起。我们说在写`redo`日志的时候都是顺序写的，写满了一个block之后会再往下一个block中写：
 
-![image_1d4viej35t9nvld8o3141s8pp.png-69.5kB][20]
+![][21-20]
 
 &emsp;&emsp;普通block的`log block header`部分有一个称之为`LOG_BLOCK_HDR_DATA_LEN`的属性，该属性值记录了当前block里使用了多少字节的空间。对于被填满的block来说，该值永远为`512`。如果该属性的值不为`512`，那么就是它了，它就是此次奔溃恢复中需要扫描的最后一个block。
 
 ### 怎么恢复
 &emsp;&emsp;确定了需要扫描哪些`redo`日志进行奔溃恢复之后，接下来就是怎么进行恢复了。假设现在的`redo`日志文件中有5条`redo`日志，如图：
 
-![image_1d4vjuf9l17og1papl3e16is1m9f16.png-59.9kB][21]
+![][21-21]
 
 &emsp;&emsp;由于`redo 0`在`checkpoint_lsn`后边，恢复时可以不管它。我们现在可以按照`redo`日志的顺序依次扫描`checkpoint_lsn`之后的各条redo日志，按照日志中记载的内容将对应的页面恢复出来。这样没什么问题，不过设计`InnoDB`的大佬还是想了一些办法加快这个恢复的过程：
 
@@ -285,7 +285,7 @@ Last checkpoint at  124052494
 
     &emsp;&emsp;根据`redo`日志的`space ID`和`page number`属性计算出散列值，把`space ID`和`page number`相同的`redo`日志放到哈希表的同一个槽里，如果有多个`space ID`和`page number`都相同的`redo`日志，那么它们之间使用链表连接起来，按照生成的先后顺序链接起来的，如图所示：
 
-    ![image_1d50lj9da176rojd12ja1lodognc.png-156.4kB][22]
+    ![][21-22]
     
     &emsp;&emsp;之后就可以遍历哈希表，因为对同一个页面进行修改的`redo`日志都放在了一个槽里，所以可以一次性将一个页面修复好（避免了很多读取页面的随机IO），这样可以加快恢复速度。另外需要注意一点的是，同一个页面的`redo`日志是按照生成时间顺序进行排序的，所以恢复的时候也是按照这个顺序进行恢复，如果不按照生成时间顺序进行排序的话，那么可能出现错误。比如原先的修改操作是先插入一条记录，再删除该条记录，如果恢复时不按照这个顺序来，就可能变成先删除一条记录，再插入一条记录，这显然是错误的。
 
@@ -302,32 +302,35 @@ Last checkpoint at  124052494
 ```
 &emsp;&emsp;这个公式里的`0x3FFFFFFFUL`可能让大家有点困惑，其实它的二进制表示可能更亲切一点：
 
-![image_1d4rt3sm81pbe1tij3pm147op9c30.png-36.9kB][23]
+![][21-23]
 
 &emsp;&emsp;从图中可以看出，`0x3FFFFFFFUL`对应的二进制数的前2位为0，后30位的值都为`1`。我们刚开始学计算机的时候就学过，一个二进制位与0做与运算（`&`）的结果肯定是0，一个二进制位与1做与运算（`&`）的结果就是原值。让一个数和`0x3FFFFFFFUL`做与运算的意思就是要将该值的前2个比特位的值置为0，这样该值就肯定小于或等于`0x3FFFFFFFUL`了。这也就说明了，不论lsn多大，`((lsn / 512) & 0x3FFFFFFFUL)`的值肯定在`0`\~`0x3FFFFFFFUL`之间，再加1的话肯定在`1`\~`0x40000000UL`之间。而`0x40000000UL`这个值大家应该很熟悉，这个值就代表着`1GB`。也就是说系统最多能产生不重复的`LOG_BLOCK_HDR_NO`值只有`1GB`个。设计InnoDB的大佬规定`redo`日志文件组中包含的所有文件大小总和不得超过512GB，一个block大小是512字节，也就是说redo日志文件组中包含的block块最多为1GB个，所以有1GB个不重复的编号值也就够用了。
 
 &emsp;&emsp;另外，`LOG_BLOCK_HDR_NO`值的第一个比特位比较特殊，称之为`flush bit`，如果该值为1，代表着本block是在某次将`log buffer`中的block刷新到磁盘的操作中的第一个被刷入的block。
 
-  [1]: ../images/21-01.png
-  [2]: ../images/21-02.png
-  [3]: ../images/21-03.png
-  [4]: ../images/21-04.png
-  [5]: ../images/21-05.png
-  [6]: ../images/21-06.png
-  [7]: ../images/21-07.png
-  [8]: ../images/21-08.png
-  [9]: ../images/21-09.png
-  [10]: ../images/21-10.png
-  [11]: ../images/21-11.png
-  [12]: ../images/21-12.png
-  [13]: ../images/21-13.png
-  [14]: ../images/21-14.png
-  [15]: ../images/21-15.png
-  [16]: ../images/21-16.png
-  [17]: ../images/21-17.png
-  [18]: ../images/21-18.png
-  [19]: ../images/21-19.png
-  [20]: ../images/21-20.png
-  [21]: ../images/21-21.png
-  [22]: ../images/21-22.png
-  [23]: ../images/21-23.png
+  [21-01]: ../images/21-01.png
+  [21-02]: ../images/21-02.png
+  [21-03]: ../images/21-03.png
+  [21-04]: ../images/21-04.png
+  [21-05]: ../images/21-05.png
+  [21-06]: ../images/21-06.png
+  [21-07]: ../images/21-07.png
+  [21-08]: ../images/21-08.png
+  [21-09]: ../images/21-09.png
+  [21-10]: ../images/21-10.png
+  [21-11]: ../images/21-11.png
+  [21-12]: ../images/21-12.png
+  [21-13]: ../images/21-13.png
+  [21-14]: ../images/21-14.png
+  [21-15]: ../images/21-15.png
+  [21-16]: ../images/21-16.png
+  [21-17]: ../images/21-17.png
+  [21-18]: ../images/21-18.png
+  [21-19]: ../images/21-19.png
+  [21-20]: ../images/21-20.png
+  [21-21]: ../images/21-21.png
+  [21-22]: ../images/21-22.png
+  [21-23]: ../images/21-23.png
+
+<div STYLE="page-break-after: always;"></div>
+

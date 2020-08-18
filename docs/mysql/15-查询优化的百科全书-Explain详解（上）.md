@@ -708,3 +708,6 @@ mysql> EXPLAIN SELECT * FROM s1 INNER JOIN s2 ON s1.key1 = s2.key1 WHERE s1.comm
 2 rows in set, 1 warning (0.00 sec)
 ```
 &emsp;&emsp;从执行计划中可以看出来，查询优化器打算把`s1`当作驱动表，`s2`当作被驱动表。我们可以看到驱动表`s1`表的执行计划的`rows`列为`9688`， `filtered`列为`10.00`，这意味着驱动表`s1`的扇出值就是`9688 × 10.00% = 968.8`，这说明还要对被驱动表执行大约`968`次查询。
+
+<div STYLE="page-break-after: always;"></div>
+

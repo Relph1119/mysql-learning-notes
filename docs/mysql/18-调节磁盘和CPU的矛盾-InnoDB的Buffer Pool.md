@@ -17,7 +17,7 @@ innodb_buffer_pool_size = 268435456
 
 &emsp;&emsp;每个缓存页对应的控制信息占用的内存大小是相同的，我们就把每个页对应的控制信息占用的一块内存称为一个`控制块`吧，<span style="color:red">控制块和缓存页是一一对应的，它们都被存放到 Buffer Pool 中，其中控制块被存放到 Buffer Pool 的前面，缓存页被存放到 Buffer Pool 后边</span>，所以整个`Buffer Pool`对应的内存空间看起来就是这样的：
 
-![image_1d15mh3d4oadq0e1qpme22u8i61.png-47.4kB][1]
+![][18-01]
 
 &emsp;&emsp;咦？控制块和缓存页之间的那个`碎片`是个什么玩意儿？你想想啊，每一个控制块都对应一个缓存页，那在分配足够多的控制块和缓存页后，可能剩余的那点儿空间不够一对控制块和缓存页的大小，自然就用不到喽，这个用不到的那点儿内存空间就被称为`碎片`了。当然，如果你把`Buffer Pool`的大小设置的刚刚好的话，也可能不会产生`碎片`～
 ```
@@ -27,7 +27,7 @@ innodb_buffer_pool_size = 268435456
 ### free链表的管理
 &emsp;&emsp;当我们最初启动`MySQL`服务器的时候，需要完成对`Buffer Pool`的初始化过程，就是先向操作系统申请`Buffer Pool`的内存空间，然后把它划分成若干对控制块和缓存页。但是此时并没有真实的磁盘页被缓存到`Buffer Pool`中（因为还没有用到），之后随着程序的运行，会不断的有磁盘上的页被缓存到`Buffer Pool`中。那么问题来了，从磁盘上读取一个页到`Buffer Pool`中的时候该放到哪个缓存页的位置呢？或者说怎么区分`Buffer Pool`中哪些缓存页是空闲的，哪些已经被使用了呢？<span style="color:red">我们最好在某个地方记录一下Buffer Pool中哪些缓存页是可用的</span>，这个时候缓存页对应的`控制块`就派上大用场了，我们可以<span style="color:red">把所有空闲的缓存页对应的控制块作为一个节点放到一个链表中</span>，这个链表也可以被称作`free链表`（或者说空闲链表）。刚刚完成初始化的`Buffer Pool`中所有的缓存页都是空闲的，所以每一个缓存页对应的控制块都会被加入到`free链表`中，假设该`Buffer Pool`中可容纳的缓存页数量为`n`，那增加了`free链表`的效果图就是这样的：
 
-![image_1d155te021bmgjt09mo1lln17dum.png-132.6kB][2]
+![][18-02]
 
 &emsp;&emsp;从图中可以看出，我们为了管理好这个`free链表`，特意为这个链表定义了一个`基节点`，里边儿包含着链表的头节点地址，尾节点地址，以及当前链表中节点的数量等信息。这里需要注意的是，链表的基节点占用的内存空间并不包含在为`Buffer Pool`申请的一大片连续内存空间之内，而是单独申请的一块内存空间。
 ```
@@ -50,7 +50,7 @@ innodb_buffer_pool_size = 268435456
 
 &emsp;&emsp;但是如果不立即同步到磁盘的话，那之后再同步的时候我们怎么知道`Buffer Pool`中哪些页是`脏页`，哪些页从来没被修改过呢？总不能把所有的缓存页都同步到磁盘上吧，假如`Buffer Pool`被设置的很大，比方说`300G`，那一次性同步这么多数据岂不是要慢死！所以，我们不得不再创建一个存储脏页的链表，凡是修改过的缓存页对应的控制块都会作为一个节点加入到一个链表中，因为这个链表节点对应的缓存页都是需要被刷新到磁盘上的，所以也叫`flush链表`。链表的构造和`free链表`差不多，假设某个时间点`Buffer Pool`中的脏页数量为`n`，那么对应的`flush链表`就长这样：
 
-![image_1d1589dpqmt5v1849s7614nu23.png-133.5kB][3]
+![][18-03]
 
 ### LRU链表的管理
 
@@ -101,7 +101,7 @@ innodb_buffer_pool_size = 268435456
 
 &emsp;&emsp;为了方便大家理解，我们把示意图做了简化，各位领会精神就好：
 
-![image_1d15fb53d2lf13ovglg1rnv1h2n2g.png-116.5kB][4]
+![][18-04]
 
 &emsp;&emsp;大家要特别注意一个事儿：<span style="color:red">我们是按照某个比例将LRU链表分成两半的，不是某些节点固定是young区域的，某些节点固定是old区域的，随着程序的运行，某个节点所属的区域也可能发生变化</span>。那这个划分成两截的比例怎么确定呢？对于`InnoDB`存储引擎来说，我们可以通过查看系统变量`innodb_old_blocks_pct`的值来确定`old`区域在`LRU链表`中所占的比例，比方说这样：
 ```
@@ -185,7 +185,7 @@ innodb_buffer_pool_instances = 2
 ```
 &emsp;&emsp;这样就表明我们要创建2个`Buffer Pool`实例，示意图就是这样：
 
-![image_1d15nmrbi19mv1tbk191eoqbmb47e.png-87.2kB][5]   
+![][18-05]   
 
 ```
 小贴士：为了简便，我只把各个链表的基节点画出来了，大家应该心里清楚这些链表的节点其实就是每个缓存页对应的控制块！
@@ -202,7 +202,7 @@ innodb_buffer_pool_size/innodb_buffer_pool_instances
 ### innodb_buffer_pool_chunk_size
 &emsp;&emsp;在`MySQL 5.7.5`之前，`Buffer Pool`的大小只能在服务器启动时通过配置`innodb_buffer_pool_size`启动参数来调整大小，在服务器运行过程中是不允许调整该值的。不过设计`MySQL`的大佬在`5.7.5`以及之后的版本中支持了在服务器运行过程中调整`Buffer Pool`大小的功能，但是有一个问题，就是每次当我们要重新调整`Buffer Pool`大小时，都需要重新向操作系统申请一块连续的内存空间，然后将旧的`Buffer Pool`中的内容复制到这一块新空间，这是极其耗时的。所以设计`MySQL`的大佬们决定不再一次性为某个`Buffer Pool`实例向操作系统申请一大片连续的内存空间，而是以一个所谓的`chunk`为单位向操作系统申请空间。也就是说一个`Buffer Pool`实例其实是由若干个`chunk`组成的，一个`chunk`就代表一片连续的内存空间，里边儿包含了若干缓存页与其对应的控制块，画个图表示就是这样：
 
-![image_1d15r7te41q58egj1b4plh615ug7r.png-125.5kB][6]
+![][18-06]
 
 &emsp;&emsp;上图代表的`Buffer Pool`就是由2个实例组成的，每个实例中又包含2个`chunk`。
 
@@ -367,9 +367,12 @@ mysql>
     SHOW ENGINE INNODB STATUS\G
     ```
 
-  [1]: ../images/18-01.png
-  [2]: ../images/18-02.png
-  [3]: ../images/18-03.png
-  [4]: ../images/18-04.png
-  [5]: ../images/18-05.png
-  [6]: ../images/18-06.png
+  [18-01]: ../images/18-01.png
+  [18-02]: ../images/18-02.png
+  [18-03]: ../images/18-03.png
+  [18-04]: ../images/18-04.png
+  [18-05]: ../images/18-05.png
+  [18-06]: ../images/18-06.png
+  
+<div STYLE="page-break-after: always;"></div>
+

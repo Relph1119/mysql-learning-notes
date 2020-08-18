@@ -37,7 +37,7 @@ mysql> SELECT * FROM hero;
 
     &emsp;&emsp;如果<span style="color:red">一个事务修改了另一个未提交事务修改过的数据</span>，那就意味着发生了`脏写`，示意图如下：
 
-    ![image_1d8nigfq618jd1cc56231rt0uq19.png-78.2kB][1]
+    ![][24-01]
     
     &emsp;&emsp;如上图，`Session A`和`Session B`各开启了一个事务，`Session B`中的事务先将`number`列为`1`的记录的`name`列更新为`'关羽'`，然后`Session A`中的事务接着又把这条`number`列为`1`的记录的`name`列更新为`张飞`。如果之后`Session B`中的事务进行了回滚，那么`Session A`中的更新也将不复存在，这种现象就称之为`脏写`。这时`Session A`中的事务就很懵逼，我明明把数据更新了，最后也提交事务了，怎么到最后说自己什么也没干呢？
     
@@ -45,7 +45,7 @@ mysql> SELECT * FROM hero;
     
     &emsp;&emsp;如果<span style="color:red">一个事务读到了另一个未提交事务修改过的数据</span>，那就意味着发生了`脏读`，示意图如下：
 
-    ![image_1d8nn50kndkd8641epplvelhk9.png-91.8kB][2]
+    ![][24-02]
 
     &emsp;&emsp;如上图，`Session A`和`Session B`各开启了一个事务，`Session B`中的事务先将`number`列为`1`的记录的`name`列更新为`'关羽'`，然后`Session A`中的事务再去查询这条`number`为`1`的记录，如果du到列`name`的值为`'关羽'`，而`Session B`中的事务稍后进行了回滚，那么`Session A`中的事务相当于读到了一个不存在的数据，这种现象就称之为`脏读`。
 
@@ -53,7 +53,7 @@ mysql> SELECT * FROM hero;
 
     &emsp;&emsp;如果<span style="color:red">一个事务只能读到另一个已经提交的事务修改过的数据，并且其他事务每对该数据进行一次修改并提交后，该事务都能查询得到最新值</span>，那就意味着发生了`不可重复读`，示意图如下：
     
-    ![image_1d8nk4k1e1mt51nsj1hg41cd7v5950.png-139.4kB][3]
+    ![][24-03]
         
     &emsp;&emsp;如上图，我们在`Session B`中提交了几个隐式事务（注意是隐式事务，意味着语句结束事务就提交了），这些事务都修改了`number`列为`1`的记录的列`name`的值，每次事务提交之后，如果`Session A`中的事务都可以查看到最新的值，这种现象也被称之为`不可重复读`。
     
@@ -61,7 +61,7 @@ mysql> SELECT * FROM hero;
 
     &emsp;&emsp;如果<span style="color:red">一个事务先根据某些条件查询出一些记录，之后另一个事务又向表中插入了符合这些条件的记录，原先的事务再次按照该条件查询时，能把另一个事务插入的记录也读出来</span>，那就意味着发生了`幻读`，示意图如下：
     
-    ![image_1d8nl564faluogc1eqn1am812v79.png-96.1kB][4]
+    ![][24-04]
     
     &emsp;&emsp;如上图，`Session A`中的事务先根据条件`number > 0`这个条件查询表`hero`，得到了`name`列值为`'刘备'`的记录；之后`Session B`中提交了一个隐式事务，该事务向表`hero`中插入了一条新记录；之后`Session A`中的事务再根据相同的条件`number > 0`查询表`hero`，得到的结果集中包含`Session B`中的事务新插入的那条记录，这种现象也被称之为`幻读`。
     
@@ -198,7 +198,7 @@ mysql> SELECT * FROM hero;
 ```
 &emsp;&emsp;假设插入该记录的`事务id`为`80`，那么此刻该条记录的示意图如下所示：
 
-![image_1d8oab1ubb7v5f41j2pai21co19.png-22.4kB][5]
+![][24-05]
 
 ```
 小贴士：实际上insert undo只在事务回滚时起作用，当事务提交后，该类型的undo日志就没用了，它占用的Undo Log Segment也会被系统回收（也就是该undo日志占用的Undo页面链表要么被重用，要么被释放）。虽然真正的insert undo日志占用的存储空间被释放了，但是roll_pointer的值并不会被清除，roll_pointer属性占用7个字节，第一个比特位就标记着它指向的undo日志的类型，如果该比特位的值为1时，就代表着它zhi向的undo日志类型为insert undo。所以我们之后在画图时都会把insert undo给去掉，大家留意一下就好了。
@@ -206,14 +206,14 @@ mysql> SELECT * FROM hero;
 
 &emsp;&emsp;假设之后两个`事务id`分别为`100`、`200`的事务对这条记录进行`UPDATE`操作，操作流程如下：
 
-![image_1d8obbc861ulkpt3no31gecrho16.png-92.3kB][6]
+![][24-06]
 
 ```
 小贴士：能不能在两个事务中交叉更新同一条记录呢？这不就是一个事务修改了另一个未提交事务修改过的数据，沦为了脏写了么？InnoDB使用锁来保证不会有脏写情况的发生，也就是在第一个事务更新了某条记录后，就会给这条记录加锁，另一个事务再次更新时就需要等待第一个事务提交了，把锁释放之后才可以继续更新。关于锁的更多细节我们后续的文章中再介绍～
 ```
 &emsp;&emsp;每次对记录进行改动，都会记录一条`undo日志`，每条`undo日志`也都有一个`roll_pointer`属性（`INSERT`操作对应的`undo日志`没有该属性，因为该记录并没有更早的版本），可以将这些`undo日志`都连起来，串成一个链表，所以现在的情况就像下图一样：
 
-![image_1d8po6kgkejilj2g4t3t81evm20.png-81.7kB][7]
+![][24-07]
 
 &emsp;&emsp;对该记录每次更新后，都会将旧值放到一条`undo日志`中，就算是该记录的一个旧版本，随着更新次数的增多，所有的版本都会被`roll_pointer`属性连接成一个链表，我们把这个链表称之为`版本链`，<span style="color:red">版本链的头节点就是当前记录最新的值</span>。另外，每个版本中还包含生成该版本时对应的`事务id`，这个信息很重要，我们稍后就会用到。
 
@@ -275,7 +275,7 @@ BEGIN;
 ```
 &emsp;&emsp;此刻，表`hero`中`number`为`1`的记录得到的版本链表如下所示：
 
-![image_1d8poeb056ck1d552it4t91aro2d.png-63.7kB][8]
+![][24-08]
 
 &emsp;&emsp;假设现在有一个使用`READ COMMITTED`隔离级别的事务开始执行：
 ```
@@ -317,7 +317,7 @@ UPDATE hero SET name = '诸葛亮' WHERE number = 1;
 ```
 &emsp;&emsp;此刻，表`hero`中`number`为`1`的记录的版本链就长这样：
 
-![image_1d8poudrjdrk4k0i22bj10g82q.png-78.6kB][9]
+![][24-09]
 
 &emsp;&emsp;然后再到刚才使用`READ COMMITTED`隔离级别的事务中继续查找这个`number`为`1`的记录，如下：
 ```
@@ -361,7 +361,7 @@ BEGIN;
 
 &emsp;&emsp;此刻，表`hero`中`number`为`1`的记录得到的版本链表如下所示：
 
-![image_1d8pt2nd6moqtjn12hibgj91f37.png-60.9kB][10]
+![][24-10]
 
 &emsp;&emsp;假设现在有一个使用`REPEATABLE READ`隔离级别的事务开始执行：
 ```
@@ -403,7 +403,7 @@ UPDATE hero SET name = '诸葛亮' WHERE number = 1;
 ```
 &emsp;&emsp;此刻，表`hero`中`number`为`1`的记录的版本链就长这样：
 
-![image_1d8ptbc339kdk0b1du3nef6s03k.png-78.2kB][11]
+![][24-11]
 
 &emsp;&emsp;然后再到刚才使用`REPEATABLE READ`隔离级别的事务中继续查找这个`number`为`1`的记录，如下：
 ```
@@ -439,14 +439,17 @@ SELECT * FROM hero WHERE number = 1; # 得到的列name的值仍为'刘备'
 
 &emsp;&emsp;随着系统的运行，在确定系统中包含最早产生的那个`ReadView`的事务不会再访问某些`update undo日志`以及被打了删除标记的记录后，有一个后台运行的`purge线程`会把它们真正的删除掉。关于更多的purge细节，我们将放到纸质书中进行详细介绍，不见不散～
 
-  [1]: ../images/24-01.png
-  [2]: ../images/24-02.png
-  [3]: ../images/24-03.png
-  [4]: ../images/24-04.png
-  [5]: ../images/24-05.png
-  [6]: ../images/24-06.png
-  [7]: ../images/24-07.png
-  [8]: ../images/24-08.png
-  [9]: ../images/24-09.png
-  [10]: ../images/24-10.png
-  [11]: ../images/24-11.png
+  [24-01]: ../images/24-01.png
+  [24-02]: ../images/24-02.png
+  [24-03]: ../images/24-03.png
+  [24-04]: ../images/24-04.png
+  [24-05]: ../images/24-05.png
+  [24-06]: ../images/24-06.png
+  [24-07]: ../images/24-07.png
+  [24-08]: ../images/24-08.png
+  [24-09]: ../images/24-09.png
+  [24-10]: ../images/24-10.png
+  [24-11]: ../images/24-11.png
+  
+<div STYLE="page-break-after: always;"></div>
+

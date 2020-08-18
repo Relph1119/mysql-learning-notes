@@ -364,3 +364,6 @@ INSUFFICIENT_PRIVILEGES: 0
 &emsp;&emsp;我们所说的基于成本的优化主要集中在`optimize`阶段，对于单表查询来说，我们主要关注`optimize`阶段的`"rows_estimation"`这个过程，这个过程深入分析了对单表查询的各种执行方案的成本；对于多表连接查询来说，我们更多需要关注`"considered_execution_plans"`这个过程，这个过程里会写明各种不同的连接方式所对应的成本。反正优化器最终会选择成本最低的那种方案来作为最终的执行计划，也就是我们使用`EXPLAIN`语句所展现出的那种方案。
 
 &emsp;&emsp;如果有小伙伴对使用`EXPLAIN`语句展示出的对某个查询的执行计划很不理解，大家可以尝试使用`optimizer trace`功能来详细了解每一种执行方案对应的成本，相信这个功能能让大家更深入的了解`MySQL`查询优化器。
+
+<div STYLE="page-break-after: always;"></div>
+

@@ -55,7 +55,7 @@
 ### trx_id隐藏列
 &emsp;&emsp;我们前面介绍`InnoDB`记录行格式的时候重点强调过：<span style="color:red">聚簇索引的记录除了会保存完整的用户数据以外，而且还会自动添加名为trx_id、roll_pointer的隐藏列，如果用户没有在表中定义主键以及UNIQUE键，还会自动添加一个名为row_id的隐藏列</span>。所以一条记录在页面中的真实结构看起来就是这样的：
 
-![image_1d62h05ffsum114cn05koa1igbp.png-45.1kB][1]
+![][22-01]
 
 &emsp;&emsp;其中的`trx_id`列其实还蛮好理解的，就是某个对这个聚簇索引记录做改动的语句所在的事务对应的`事务id`而已（此处的改动可以是`INSERT`、`DELETE`、`UPDATE`操作）。至于`roll_pointer`隐藏列我们后边分析～
 
@@ -87,7 +87,7 @@ mysql> SELECT * FROM information_schema.innodb_sys_tables WHERE name = 'xiaohaiz
 ### INSERT操作对应的undo日志
 &emsp;&emsp;我们前面说过，当我们向表中插入一条记录时会有`乐观插入`和`悲观插入`的区分，但是不管怎么插入，最终导致的结果就是这条记录被放到了一个数据页中。如果希望回滚这个插入操作，那么把这条记录删除就好了，也就是说在写对应的`undo`日志时，主要是把这条记录的主键信息记上。所以设计`InnoDB`的大佬设计了一个类型为`TRX_UNDO_INSERT_REC`的`undo日志`，它的完整结构如下图所示：
 
-![image_1d65eln739ukbei9pgid81pr57o.png-112.4kB][2]
+![][22-02]
 
 根据示意图我们强调几点：
 - `undo no`在一个事务中是从`0`开始递增的，也就是说只要事务没提交，每生成一条`undo日志`，那么该条日志的`undo no`就增1。
@@ -108,11 +108,11 @@ INSERT INTO undo_demo(id, key1, col)
 
 - 第一条`undo日志`的`undo no`为`0`，记录主键占用的存储空间长度为`4`，真实值为`1`。画一个示意图就是这样：
 
-    ![image_1d658eq7rokf19jffpt20010b63t.png-52.6kB][3]
+    ![][22-03]
 
 - 第二条`undo日志`的`undo no`为`1`，记录主键占用的存储空间长度为`4`，真实值为`2`。画一个示意图就是这样（与第一条`undo日志`对比，`undo no`和主键各列信息有不同）：
 
-    ![image_1d658gaqa1n1g5b7166lden5je4q.png-52.5kB][4]
+    ![][22-04]
 
 ```
 小贴士：为了最大限度的节省undo日志占用的存储空间，和我们前面说过的redo日志类似，设计InnoDB的大佬会给undo日志中的某些属性进行压缩处理，具体的压缩细节我们就不介绍了。
@@ -121,14 +121,14 @@ INSERT INTO undo_demo(id, key1, col)
 #### roll_pointer隐藏列的含义
 &emsp;&emsp;是时候揭开`roll_pointer`的真实面纱了，这个占用`7`个字节的字段其实一点都不神秘，本质上就是一个指向记录对应的`undo日志`的一个指针。比方说我们上面向`undo_demo`表里插入了2条记录，每条记录都有与其对应的一条`undo日志`。记录被存储到了类型为`FIL_PAGE_INDEX`的页面中（就是我们前面一直所说的`数据页`），`undo日志`被存放到了类型为`FIL_PAGE_UNDO_LOG`的页面中。效果如图所示：
 
-![image_1d65h98l3qve1ekb13epv4f37685.png-70.6kB][5]
+![][22-05]
 
 &emsp;&emsp;从图中也可以更直观的看出来，`roll_pointer`<span style="color:red">本质就是一个指针，指向记录对应的undo日志</span>。不过这`7`个字节的`roll_pointer`的每一个字节具体的含义我们后边介绍完如何分配存储`undo`日志的页面之后再具体说～
 
 ### DELETE操作对应的undo日志
 &emsp;&emsp;我们知道插入到页面中的记录会根据记录头信息中的`next_record`属性组成一个单向链表，我们把这个链表称之为`正常记录链表`；我们在前面介绍数据页结构的时候说过，被删除的记录其实也会根据记录头信息中的`next_record`属性组成一个链表，只不过这个链表中的记录占用的存储空间可以被重新利用，所以也称这个链表为`垃圾链表`。`Page Header`部分有一个称之为`PAGE_FREE`的属性，它指向由被删除记录组成的垃圾链表中的头节点。为了故事的顺利发展，我们先画一个图，假设此刻某个页面中的记录分布情况是这样的（这个不是`undo_demo`表中的记录，只是我们随便举的一个例子）：
 
-![image_1d6abjg9n1kocq5d10j6250164v9.png-62.8kB][6]
+![][22-06]
 
 &emsp;&emsp;为了突出主题，在这个简化版的示意图中，我们只把记录的`delete_mask`标志位展示了出来。从图中可以看出，`正常记录链表`中包含了3条正常记录，`垃圾链表`里包含了2条已删除记录，在`垃圾链表`中的这些记录占用的存储空间可以被重新利用。页面的`Page Header`部分的`PAGE_FREE`属性的值代表指向`垃圾链表`头节点的指针。假设现在我们准备使用`DELETE`语句把`正常记录链表`中的最后一条记录给删除掉，其实这个删除的过程需要经历两个阶段：
 
@@ -136,7 +136,7 @@ INSERT INTO undo_demo(id, key1, col)
     
     &emsp;&emsp;把这个过程画下来就是这样：
 
-    ![image_1d78ts1ajulu1v9o11i2g619s3p.png-64.1kB][7]
+    ![][22-07]
     
     &emsp;&emsp;可以看到，`正常记录链表`中的最后一条记录的`delete_mask`值被设置为`1`，但是并没有被加入到`垃圾链表`。也就是此时记录处于一个`中间状态`，跟猪八戒照镜子——里外不是人似的。在删除语句所在的事务提交之前，被删除的记录一直都处于这种所谓的`中间状态`。
     
@@ -148,7 +148,7 @@ INSERT INTO undo_demo(id, key1, col)
     
     &emsp;&emsp;把`阶段二`执行完了，这条记录就算是真正的被删除掉了。这条已删除记录占用的存储空间也可以被重新利用了。画下来就是这样：
 
-    ![image_1d6aebg8h1h8cb60dp415e86oq1j.png-69.5kB][8]
+    ![][22-08]
 
     &emsp;&emsp;对照着图我们还要注意一点，将被删除记录加入到`垃圾链表`时，实际上加入到链表的头节点处，会跟着修改`PAGE_FREE`属性的值。
 
@@ -158,13 +158,13 @@ INSERT INTO undo_demo(id, key1, col)
 
 &emsp;&emsp;从上面的描述中我们也可以看出来，在删除语句所在的事务提交之前，只会经历`阶段一`，也就是`delete mark`阶段（提交之后我们就不用回滚了，所以只需考虑对删除操作的`阶段一`做的影响进行回滚）。设计`InnoDB`的大佬为此设计了一种称之为`TRX_UNDO_DEL_MARK_REC`类型的`undo日志`，它的完整结构如下图所示：
 
-![image_1d6avo9eb10dd26lb9jo2o10hu9.png-134.6kB][9]
+![][22-09]
 
 &emsp;&emsp;这个里边的属性也太多了点儿吧～（其实大部分属性的意思我们上面已经介绍过了） 是的，的确有点多，不过大家千万不要在意，如果记不住千万不要勉强自己，我这里把它们都列出来让大家混个脸熟而已。劳烦大家先克服一下密集恐急症，再抬头大致看一遍上面的这个类型为`TRX_UNDO_DEL_MARK_REC`的`undo日志`中的属性，特别注意一下这几点：
 
 - 在对一条记录进行`delete mark`操作前，需要把该记录的旧的`trx_id`和`roll_pointer`隐藏列的值都给记到对应的`undo日志`中来，就是我们图中显示的`old trx_id`和`old roll_pointer`属性。这样有一个好处，那就是可以通过`undo日志`的`old roll_pointer`找到记录在修改之前对应的`undo`日志。比方说在一个事务中，我们先插入了一条记录，然后又执行对该记录的删除操作，这个过程的示意图就是这样：
 
-    ![image_1d6cg2ocf8ctpot13121pb7a9tp.png-36.4kB][10]
+    ![][22-10]
     
     &emsp;&emsp;从图中可以看出来，执行完`delete mark`操作后，它对应的`undo`日志和`INSERT`操作对应的`undo`日志就串成了一个链表。这个很有意思啊，这个链表就称之为`版本链`，现在貌似看不出这个`版本链`有什么用，等我们再往后看看，讲完`UPDATE`操作对应的`undo`日志后，这个所谓的`版本链`就慢慢的展现出它的牛逼之处了。
 
@@ -183,7 +183,7 @@ DELETE FROM undo_demo WHERE id = 1;
 ```
 &emsp;&emsp;这个`delete mark`操作对应的`undo日志`的结构就是这样：
 
-![image_1d6bbl6nnk8a1ntk1d0ggmog6837.png-113.3kB][11]
+![][22-11]
 
 &emsp;&emsp;对照着这个图，我们得注意下面几点：
 - 因为这条`undo`日志是`id`为`100`的事务中产生的第3条`undo`日志，所以它对应的`undo no`就是`2`。
@@ -198,7 +198,7 @@ DELETE FROM undo_demo WHERE id = 1;
         
         &emsp;&emsp;画一个图演示一下就是这样：
         
-        ![image_1d65ppnsu18o7ggb1lg114o7kf28i.png-39.6kB][12]
+        ![][22-12]
         
         &emsp;&emsp;所以对于`id`列来说，最终存储的结果就是`<0, 4, 1>`，存储这些信息占用的存储空间大小为`1 + 1 + 4 = 6`个字节。
 
@@ -210,7 +210,7 @@ DELETE FROM undo_demo WHERE id = 1;
         
         &emsp;&emsp;画一个图演示一下就是这样：
         
-        ![image_1d65pvdmq6o6qgr8918fhlr9f.png-47.3kB][13]
+        ![][22-13]
         
         &emsp;&emsp;所以对于`key1`列来说，最终存储的结果就是`<3, 3, 'AWM'>`，存储这些信息占用的存储空间大小为`1 + 1 + 3 = 5`个字节。
         
@@ -226,7 +226,7 @@ DELETE FROM undo_demo WHERE id = 1;
 
     &emsp;&emsp;更新记录时，对于被更新的<span style="color:red">每个列</span>来说，如果更新后的列和更新前的列占用的存储空间都一样大，那么就可以进行`就地更新`，也就是直接在原记录的基础上修改对应列的值。再次强调一边，是<span style="color:red">每个列</span>在更新前后占用的存储空间一样大，有任何一个被更新的列更新前比更新后占用的存储空间大，或者更新前比更新后占用的存储空间小都不能进行`就地更新`。比方说现在`undo_demo`表里还有一条`id`值为`2`的记录，它的各个列占用的大小如图所示（因为采用`utf8`字符集，所以`'步枪'`这两个字符占用6个字节）：
     
-    ![image_1d67tvp7i1ke1bhn1pre1usu1lvs1p.png-43.5kB][14]        
+    ![][22-14]        
 
     &emsp;&emsp;假如我们有这样的`UPDATE`语句：
     ```
@@ -253,7 +253,7 @@ DELETE FROM undo_demo WHERE id = 1;
  
 &emsp;&emsp;针对`UPDATE`不更新主键的情况（包括上面所说的就地更新和先删除旧记录再插入新记录），设计`InnoDB`的大佬们设计了一种类型为`TRX_UNDO_UPD_EXIST_REC`的`undo日志`，它的完整结构如下：
 
-![image_1d9i13fuqvt2i9qtg9gg2ju2p.png-128.8kB][15]
+![][22-15]
 
 &emsp;&emsp;其实大部分属性和我们介绍过的`TRX_UNDO_DEL_MARK_REC`类型的`undo日志`是类似的，不过还是要注意这么几点：
 
@@ -279,7 +279,7 @@ UPDATE undo_demo
 ```
 &emsp;&emsp;这个`UPDATE`语句更新的列大小都没有改动，所以可以采用`就地更新`的方式来执行，在真正改动页面记录时，会先记录一条类型为`TRX_UNDO_UPD_EXIST_REC`的`undo日志`，长这样：
 
-![image_1d6bbqp2f3q160v1lribq31n0f44.png-141.9kB][16]
+![][22-16]
 
 &emsp;&emsp;对照着这个图我们注意一下这几个地方：
 - 因为这条`undo日志`是`id`为`100`的事务中产生的第4条`undo日志`，所以它对应的`undo no`就是3。
@@ -307,19 +307,22 @@ UPDATE undo_demo
 小贴士：其实还有一种称为TRX_UNDO_UPD_DEL_REC的undo日志的类型我们没有介绍，主要是想避免引入过多的复杂度，如果大家对这种类型的undo日志的使用感兴趣的话，可以额外查一下别的资料。
 ```
 
-  [1]: ../images/22-01.png
-  [2]: ../images/22-02.png
-  [3]: ../images/22-03.png
-  [4]: ../images/22-04.png
-  [5]: ../images/22-05.png
-  [6]: ../images/22-06.png
-  [7]: ../images/22-07.png
-  [8]: ../images/22-08.png
-  [9]: ../images/22-09.png
-  [10]: ../images/22-10.png
-  [11]: ../images/22-11.png
-  [12]: ../images/22-12.png
-  [13]: ../images/22-13.png
-  [14]: ../images/22-14.png
-  [15]: ../images/22-15.png
-  [16]: ../images/22-16.png
+  [22-01]: ../images/22-01.png
+  [22-02]: ../images/22-02.png
+  [22-03]: ../images/22-03.png
+  [22-04]: ../images/22-04.png
+  [22-05]: ../images/22-05.png
+  [22-06]: ../images/22-06.png
+  [22-07]: ../images/22-07.png
+  [22-08]: ../images/22-08.png
+  [22-09]: ../images/22-09.png
+  [22-10]: ../images/22-10.png
+  [22-11]: ../images/22-11.png
+  [22-12]: ../images/22-12.png
+  [22-13]: ../images/22-13.png
+  [22-14]: ../images/22-14.png
+  [22-15]: ../images/22-15.png
+  [22-16]: ../images/22-16.png
+  
+<div STYLE="page-break-after: always;"></div>
+

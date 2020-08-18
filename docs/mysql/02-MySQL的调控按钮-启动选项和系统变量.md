@@ -512,3 +512,6 @@ mysql> SHOW STATUS LIKE 'thread%';
 mysql>
 ```
 &emsp;&emsp;所有以`Thread`开头的`SESSION`作用范围的状态变量就都被展示出来了。
+
+<div STYLE="page-break-after: always;"></div>
+
