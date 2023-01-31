@@ -17,7 +17,6 @@
 &emsp;&emsp;不过`InnoDB`默认是<span style="color:red">以表为单位来收集和存储统计数据的</span>，也就是说我们可以把某些表的统计数据（以及该表的索引统计数据）存储在磁盘上，把另一些表的统计数据存储在内存中。怎么做到的呢？我们可以在创建和修改表的时候通过指定`STATS_PERSISTENT`属性来指明该表的统计数据存储方式：
 ```
 CREATE TABLE 表名 (...) Engine=InnoDB, STATS_PERSISTENT = (1|0);
-
 ALTER TABLE 表名 Engine=InnoDB, STATS_PERSISTENT = (1|0);
 ```
 &emsp;&emsp;当`STATS_PERSISTENT=1`时，表明我们想把该表的统计数据永久的存储到磁盘上，当`STATS_PERSISTENT=0`时，表明我们想把该表的统计数据临时的存储到内存中。如果我们在创建表时未指定`STATS_PERSISTENT`属性，那默认采用系统变量`innodb_stats_persistent`的值作为该属性的值。
@@ -275,6 +274,7 @@ mysql> SELECT * FROM mysql.innodb_index_stats WHERE table_name = 'single_table';
     &emsp;&emsp;在真正执行对`t2`表的查询前，`t1.comumn`的值是不确定的，所以我们也不能通过`index dive`的方式直接访问`B+`树索引去统计每个单点区间对应的记录的数量，所以也只能依赖统计数据中的平均一个值重复多少行来计算单点区间对应的记录数量。
         
 &emsp;&emsp;在统计索引列不重复的值的数量时，有一个比较烦的问题就是索引列中出现`NULL`值怎么办，比方说某个索引列的内容是这样：
+
 ```
 +------+
 | col  |
